@@ -1,0 +1,247 @@
+{
+  "configs": {
+    "combined": {
+      "confusion": {
+        "accuracy": 1.0,
+        "f1_risky": 1.0,
+        "f1_safe": 1.0,
+        "false_negative_rate": 0.0,
+        "false_positive_rate": 0.0,
+        "fn": 0,
+        "fp": 0,
+        "n": 24,
+        "precision_risky": 1.0,
+        "precision_safe": 1.0,
+        "recall_risky": 1.0,
+        "recall_safe": 1.0,
+        "tn": 12,
+        "tp": 12
+      },
+      "safety_class_metrics": {
+        "f1_safe": 1.0,
+        "precision_safe": 1.0,
+        "recall_safe": 1.0
+      }
+    },
+    "combined_corroborated": {
+      "confusion": {
+        "accuracy": 1.0,
+        "f1_risky": 1.0,
+        "f1_safe": 1.0,
+        "false_negative_rate": 0.0,
+        "false_positive_rate": 0.0,
+        "fn": 0,
+        "fp": 0,
+        "n": 24,
+        "precision_risky": 1.0,
+        "precision_safe": 1.0,
+        "recall_risky": 1.0,
+        "recall_safe": 1.0,
+        "tn": 12,
+        "tp": 12
+      },
+      "safety_class_metrics": {
+        "f1_safe": 1.0,
+        "precision_safe": 1.0,
+        "recall_safe": 1.0
+      }
+    },
+    "ml_only": {
+      "confusion": {
+        "accuracy": 0.7083,
+        "f1_risky": 0.7742,
+        "f1_safe": 0.5882,
+        "false_negative_rate": 0.0,
+        "false_positive_rate": 0.5833,
+        "fn": 0,
+        "fp": 7,
+        "n": 24,
+        "precision_risky": 0.6316,
+        "precision_safe": 1.0,
+        "recall_risky": 1.0,
+        "recall_safe": 0.4167,
+        "tn": 5,
+        "tp": 12
+      },
+      "safety_class_metrics": {
+        "f1_safe": 0.5882,
+        "precision_safe": 1.0,
+        "recall_safe": 0.4167
+      }
+    },
+    "ml_only_conservative": {
+      "confusion": {
+        "accuracy": 0.625,
+        "f1_risky": 0.4,
+        "f1_safe": 0.7273,
+        "false_negative_rate": 0.75,
+        "false_positive_rate": 0.0,
+        "fn": 9,
+        "fp": 0,
+        "n": 24,
+        "precision_risky": 1.0,
+        "precision_safe": 0.5714,
+        "recall_risky": 0.25,
+        "recall_safe": 1.0,
+        "tn": 12,
+        "tp": 3
+      },
+      "safety_class_metrics": {
+        "f1_safe": 0.7273,
+        "precision_safe": 0.5714,
+        "recall_safe": 1.0
+      }
+    },
+    "rules_ast": {
+      "confusion": {
+        "accuracy": 1.0,
+        "f1_risky": 1.0,
+        "f1_safe": 1.0,
+        "false_negative_rate": 0.0,
+        "false_positive_rate": 0.0,
+        "fn": 0,
+        "fp": 0,
+        "n": 24,
+        "precision_risky": 1.0,
+        "precision_safe": 1.0,
+        "recall_risky": 1.0,
+        "recall_safe": 1.0,
+        "tn": 12,
+        "tp": 12
+      },
+      "safety_class_metrics": {
+        "f1_safe": 1.0,
+        "precision_safe": 1.0,
+        "recall_safe": 1.0
+      }
+    },
+    "rules_only": {
+      "confusion": {
+        "accuracy": 1.0,
+        "f1_risky": 1.0,
+        "f1_safe": 1.0,
+        "false_negative_rate": 0.0,
+        "false_positive_rate": 0.0,
+        "fn": 0,
+        "fp": 0,
+        "n": 24,
+        "precision_risky": 1.0,
+        "precision_safe": 1.0,
+        "recall_risky": 1.0,
+        "recall_safe": 1.0,
+        "tn": 12,
+        "tp": 12
+      },
+      "safety_class_metrics": {
+        "f1_safe": 1.0,
+        "precision_safe": 1.0,
+        "recall_safe": 1.0
+      }
+    }
+  },
+  "dataset": "unseen.jsonl",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.10"
+  },
+  "errors": [],
+  "ml_status": {
+    "artifact": "C:\\cogni\\models\\codeguard_clf.joblib",
+    "available": true,
+    "decision_threshold": 0.48,
+    "escalate_threshold": 0.64,
+    "reason": "loaded"
+  },
+  "per_category_combined": {
+    "ai_targeted_instructions": {
+      "f1": 1.0,
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 1,
+      "tp": 1
+    },
+    "data_exfiltration": {
+      "f1": 1.0,
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 1,
+      "tp": 1
+    },
+    "dependency_risk": {
+      "f1": 1.0,
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 1,
+      "tp": 1
+    },
+    "destructive_command": {
+      "f1": 1.0,
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 3,
+      "tp": 3
+    },
+    "obfuscated_execution": {
+      "f1": 1.0,
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 1,
+      "tp": 1
+    },
+    "persistence_or_privesc": {
+      "f1": 1.0,
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 1,
+      "tp": 1
+    },
+    "resource_exhaustion": {
+      "f1": 1.0,
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 1,
+      "tp": 1
+    },
+    "secret_access": {
+      "f1": 1.0,
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 2,
+      "tp": 2
+    },
+    "ssrf_network_exfil": {
+      "f1": 1.0,
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 1,
+      "tp": 1
+    }
+  },
+  "records": 24,
+  "risky": 12,
+  "safe": 12,
+  "warm_latency_ms": {
+    "max_ms": 2.134,
+    "p50_ms": 0.98,
+    "p95_ms": 1.297,
+    "samples": 192
+  }
+}

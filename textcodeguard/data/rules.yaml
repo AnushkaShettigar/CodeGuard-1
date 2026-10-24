@@ -31,14 +31,14 @@ rules:
     reason: "reads secret env var"
   - id: MD_SECRET_001
     category: secret_access
-    language: markdown
+    language: any
     pattern: "(AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|sk-[A-Za-z0-9]{20,})"
     weight: 0.95
     reason: "secret key leaked in text"
   - id: PY_EXFIL_001
     category: data_exfiltration
     language: python
-    pattern: "(requests|httpx|urllib)\\.(post|put|get|urlopen)[\\s\\S]{0,200}(open\\(|read\\(\\)|/etc/passwd|data\\s*=|json\\s*=)"
+    pattern: "(requests|httpx|urllib)\\.(post|put|get|urlopen)[\\s\\S]{0,200}(open\\(|read\\(\\)|/etc/passwd)"
     weight: 0.9
     reason: "sends local file over network"
   - id: SH_EXFIL_001
@@ -62,7 +62,7 @@ rules:
   - id: PY_DESTRUCT_001
     category: destructive_command
     language: python
-    pattern: "os\\.system\\(\\s*['\"][^'\"]*rm\\s+-rf"
+    pattern: "os\\.system\\(\\s*[fFrRbBuU]{0,2}['\"][^'\"]*rm\\s+-rf"
     weight: 0.95
     reason: "os.system rm -rf"
   - id: SH_DESTRUCT_001
@@ -134,7 +134,7 @@ rules:
   - id: SH_OBF_002
     category: obfuscated_execution
     language: bash
-    pattern: "eval\\s+\\$\\("
+    pattern: "eval\\s+(?:\\$\\(|[\"']?\\$\\{?\\w)"
     weight: 0.85
     reason: "eval of command substitution"
   - id: JS_OBF_001
@@ -272,7 +272,7 @@ rules:
   - id: PY_SQLI_001
     category: data_exfiltration
     language: python
-    pattern: "(SELECT|INSERT|UPDATE|DELETE)[\\s\\S]{0,200}(%\\s*[\\(\\w]|\\+\\s*\\w+|f['\"]|\\.format\\()"
+    pattern: "((SELECT|INSERT|UPDATE|DELETE)[\\s\\S]{0,200}(['\"]\\s*%\\s*[\\w(]|\\+\\s*\\w+|\\.format\\()|f['\"][\\s\\S]{0,120}(SELECT|INSERT|UPDATE|DELETE))"
     weight: 0.9
     reason: "SQL built via string interpolation (injection)"
 
@@ -314,7 +314,7 @@ rules:
   - id: PY_SSRF_ARBITRARY_001
     category: ssrf_network_exfil
     language: python
-    pattern: "(requests|httpx|urllib)\\.(get|post|request)\\(\\s*\\w+\\s*[,\\)][\\s\\S]{0,100}\\.(text|json|content|status_code)"
+    pattern: "(requests|httpx|urllib)\\.(get|post|request)\\(\\s*(?![A-Z][A-Z0-9_]*\\s*[,\\)])\\w+\\s*[,\\)][\\s\\S]{0,100}\\.(text|json|content|status_code)"
     weight: 0.75
     reason: "fetches caller-supplied URL without destination validation"
 

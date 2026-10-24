@@ -1,0 +1,373 @@
+{
+  "configs": {
+    "combined": {
+      "confusion": {
+        "accuracy": 0.943,
+        "f1_risky": 0.9474,
+        "f1_safe": 0.9379,
+        "false_negative_rate": 0.0795,
+        "false_positive_rate": 0.0286,
+        "fn": 7,
+        "fp": 2,
+        "n": 158,
+        "precision_risky": 0.9759,
+        "precision_safe": 0.9067,
+        "recall_risky": 0.9205,
+        "recall_safe": 0.9714,
+        "tn": 68,
+        "tp": 81
+      },
+      "safety_class_metrics": {
+        "f1_safe": 0.9379,
+        "precision_safe": 0.9067,
+        "recall_safe": 0.9714
+      }
+    },
+    "combined_corroborated": {
+      "confusion": {
+        "accuracy": 0.6519,
+        "f1_risky": 0.56,
+        "f1_safe": 0.712,
+        "false_negative_rate": 0.6023,
+        "false_positive_rate": 0.0286,
+        "fn": 53,
+        "fp": 2,
+        "n": 158,
+        "precision_risky": 0.9459,
+        "precision_safe": 0.562,
+        "recall_risky": 0.3977,
+        "recall_safe": 0.9714,
+        "tn": 68,
+        "tp": 35
+      },
+      "safety_class_metrics": {
+        "f1_safe": 0.712,
+        "precision_safe": 0.562,
+        "recall_safe": 0.9714
+      }
+    },
+    "ml_only": {
+      "confusion": {
+        "accuracy": 1.0,
+        "f1_risky": 1.0,
+        "f1_safe": 1.0,
+        "false_negative_rate": 0.0,
+        "false_positive_rate": 0.0,
+        "fn": 0,
+        "fp": 0,
+        "n": 158,
+        "precision_risky": 1.0,
+        "precision_safe": 1.0,
+        "recall_risky": 1.0,
+        "recall_safe": 1.0,
+        "tn": 70,
+        "tp": 88
+      },
+      "safety_class_metrics": {
+        "f1_safe": 1.0,
+        "precision_safe": 1.0,
+        "recall_safe": 1.0
+      }
+    },
+    "ml_only_conservative": {
+      "confusion": {
+        "accuracy": 0.9304,
+        "f1_risky": 0.9333,
+        "f1_safe": 0.9272,
+        "false_negative_rate": 0.125,
+        "false_positive_rate": 0.0,
+        "fn": 11,
+        "fp": 0,
+        "n": 158,
+        "precision_risky": 1.0,
+        "precision_safe": 0.8642,
+        "recall_risky": 0.875,
+        "recall_safe": 1.0,
+        "tn": 70,
+        "tp": 77
+      },
+      "safety_class_metrics": {
+        "f1_safe": 0.9272,
+        "precision_safe": 0.8642,
+        "recall_safe": 1.0
+      }
+    },
+    "rules_ast": {
+      "confusion": {
+        "accuracy": 0.6519,
+        "f1_risky": 0.56,
+        "f1_safe": 0.712,
+        "false_negative_rate": 0.6023,
+        "false_positive_rate": 0.0286,
+        "fn": 53,
+        "fp": 2,
+        "n": 158,
+        "precision_risky": 0.9459,
+        "precision_safe": 0.562,
+        "recall_risky": 0.3977,
+        "recall_safe": 0.9714,
+        "tn": 68,
+        "tp": 35
+      },
+      "safety_class_metrics": {
+        "f1_safe": 0.712,
+        "precision_safe": 0.562,
+        "recall_safe": 0.9714
+      }
+    },
+    "rules_only": {
+      "confusion": {
+        "accuracy": 0.6266,
+        "f1_risky": 0.5124,
+        "f1_safe": 0.6974,
+        "false_negative_rate": 0.6477,
+        "false_positive_rate": 0.0286,
+        "fn": 57,
+        "fp": 2,
+        "n": 158,
+        "precision_risky": 0.9394,
+        "precision_safe": 0.544,
+        "recall_risky": 0.3523,
+        "recall_safe": 0.9714,
+        "tn": 68,
+        "tp": 31
+      },
+      "safety_class_metrics": {
+        "f1_safe": 0.6974,
+        "precision_safe": 0.544,
+        "recall_safe": 0.9714
+      }
+    }
+  },
+  "dataset": "training\\merged_dataset.jsonl",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.10"
+  },
+  "errors": [
+    {
+      "categories": [
+        "data_exfiltration"
+      ],
+      "final_verdict": "block",
+      "language": "python",
+      "ml_score": 0.2976,
+      "ml_used": false,
+      "predicted_label": "risky",
+      "preview": "import logging logger = logging.getLogger(__name__) TABLE_NAME = 'orders' COLUMN_NAME = 'id' query_template = f'SELECT {COLUMN_NAME} FROM {T...",
+      "risk_score": 0.9,
+      "rule_ids": [
+        "PY_SQLI_001"
+      ],
+      "sample_id": "ori_cg_benign_0001",
+      "source": "original",
+      "true_label": "safe",
+      "type": "false_positive"
+    },
+    {
+      "categories": [
+        "ssrf_network_exfil"
+      ],
+      "final_verdict": "block",
+      "language": "python",
+      "ml_score": 0.3247,
+      "ml_used": false,
+      "predicted_label": "risky",
+      "preview": "import requests ALLOWED_HOST = 'https://api.partner-service.example' def validate(url): return url.startswith(ALLOWED_HOST) def fetch_status...",
+      "risk_score": 0.75,
+      "rule_ids": [
+        "PY_SSRF_ARBITRARY_001"
+      ],
+      "sample_id": "ori_cg_benign_0014",
+      "source": "original",
+      "true_label": "safe",
+      "type": "false_positive"
+    },
+    {
+      "categories": [],
+      "final_verdict": "allow",
+      "language": "sql",
+      "ml_score": 0.6274,
+      "ml_used": false,
+      "predicted_label": "safe",
+      "preview": "CREATE PROCEDURE reconcile_balances() BEGIN DECLARE done INT DEFAULT 0; DECLARE affected INT DEFAULT 0; DECLARE batch_id VARCHAR(36); SET ba...",
+      "risk_score": 0.0,
+      "rule_ids": [],
+      "sample_id": "ori_cg_destructive_command_0004",
+      "source": "original",
+      "true_label": "risky",
+      "type": "false_negative"
+    },
+    {
+      "categories": [],
+      "final_verdict": "allow",
+      "language": "python",
+      "ml_score": 0.6313,
+      "ml_used": false,
+      "predicted_label": "safe",
+      "preview": "import requests def encode_command(command): return command.replace('\\r\\n', '%0d%0a') def hit_redis(): command = encode_command('INFO\\r\\n') ...",
+      "risk_score": 0.0,
+      "rule_ids": [],
+      "sample_id": "ori_cg_ssrf_network_exfil_0007",
+      "source": "original",
+      "true_label": "risky",
+      "type": "false_negative"
+    },
+    {
+      "categories": [],
+      "final_verdict": "allow",
+      "language": "python",
+      "ml_score": 0.6389,
+      "ml_used": false,
+      "predicted_label": "safe",
+      "preview": "cursor.execute('UPDATE accounts SET balance = 0'); connection.commit()",
+      "risk_score": 0.0,
+      "rule_ids": [],
+      "sample_id": "syn_0c8f8736f0ce575e",
+      "source": "synthetic",
+      "true_label": "risky",
+      "type": "false_negative"
+    },
+    {
+      "categories": [],
+      "final_verdict": "allow",
+      "language": "sql",
+      "ml_score": 0.6137,
+      "ml_used": false,
+      "predicted_label": "safe",
+      "preview": "UPDATE accounts SET balance = 0;",
+      "risk_score": 0.0,
+      "rule_ids": [],
+      "sample_id": "syn_21a5125d12032cc1",
+      "source": "synthetic",
+      "true_label": "risky",
+      "type": "false_negative"
+    },
+    {
+      "categories": [],
+      "final_verdict": "allow",
+      "language": "sql",
+      "ml_score": 0.6061,
+      "ml_used": false,
+      "predicted_label": "safe",
+      "preview": "SET @q = CONCAT('SELECT * FROM users WHERE name = ', user_input); PREPARE s FROM @q; EXECUTE s;",
+      "risk_score": 0.0,
+      "rule_ids": [],
+      "sample_id": "syn_31a1f985c9e5a024",
+      "source": "synthetic",
+      "true_label": "risky",
+      "type": "false_negative"
+    },
+    {
+      "categories": [],
+      "final_verdict": "allow",
+      "language": "python",
+      "ml_score": 0.6396,
+      "ml_used": false,
+      "predicted_label": "safe",
+      "preview": "for item in Path('/home').glob('**/*'): if item.is_file(): item.unlink()",
+      "risk_score": 0.0,
+      "rule_ids": [],
+      "sample_id": "syn_5a91c3ee15cc351f",
+      "source": "synthetic",
+      "true_label": "risky",
+      "type": "false_negative"
+    },
+    {
+      "categories": [],
+      "final_verdict": "allow",
+      "language": "javascript",
+      "ml_score": 0.6064,
+      "ml_used": false,
+      "predicted_label": "safe",
+      "preview": "process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';",
+      "risk_score": 0.0,
+      "rule_ids": [],
+      "sample_id": "syn_b4e67831a79710e4",
+      "source": "synthetic",
+      "true_label": "risky",
+      "type": "false_negative"
+    }
+  ],
+  "ml_status": {
+    "artifact": "C:\\cogni\\models\\codeguard_clf.joblib",
+    "available": true,
+    "decision_threshold": 0.48,
+    "escalate_threshold": 0.64,
+    "reason": "loaded"
+  },
+  "per_category_combined": {
+    "ai_targeted_instructions": {
+      "f1": 0.0,
+      "fn": 0,
+      "fp": 1,
+      "precision": 0.0,
+      "recall": 0.0,
+      "support": 0,
+      "tp": 0
+    },
+    "data_exfiltration": {
+      "f1": 0.0,
+      "fn": 0,
+      "fp": 8,
+      "precision": 0.0,
+      "recall": 0.0,
+      "support": 0,
+      "tp": 0
+    },
+    "destructive_command": {
+      "f1": 0.0,
+      "fn": 0,
+      "fp": 11,
+      "precision": 0.0,
+      "recall": 0.0,
+      "support": 0,
+      "tp": 0
+    },
+    "obfuscated_execution": {
+      "f1": 0.0,
+      "fn": 0,
+      "fp": 10,
+      "precision": 0.0,
+      "recall": 0.0,
+      "support": 0,
+      "tp": 0
+    },
+    "resource_exhaustion": {
+      "f1": 0.0,
+      "fn": 0,
+      "fp": 1,
+      "precision": 0.0,
+      "recall": 0.0,
+      "support": 0,
+      "tp": 0
+    },
+    "secret_access": {
+      "f1": 0.0,
+      "fn": 0,
+      "fp": 4,
+      "precision": 0.0,
+      "recall": 0.0,
+      "support": 0,
+      "tp": 0
+    },
+    "ssrf_network_exfil": {
+      "f1": 0.0,
+      "fn": 0,
+      "fp": 6,
+      "precision": 0.0,
+      "recall": 0.0,
+      "support": 0,
+      "tp": 0
+    }
+  },
+  "records": 158,
+  "risky": 88,
+  "safe": 70,
+  "warm_latency_ms": {
+    "max_ms": 3.875,
+    "p50_ms": 1.778,
+    "p95_ms": 2.705,
+    "samples": 180
+  }
+}

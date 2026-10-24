@@ -1,0 +1,56 @@
+{
+  "category_counts_risky": {
+    "ai_targeted_instructions": 4,
+    "data_exfiltration": 6,
+    "dependency_risk": 3,
+    "destructive_command": 5,
+    "obfuscated_execution": 6,
+    "persistence_or_privesc": 2,
+    "resource_exhaustion": 3,
+    "secret_access": 4,
+    "ssrf_network_exfil": 3
+  },
+  "dataset_fingerprint_sha256": "ac8b888240c9487c41b0b905c7619cffdb512b371f2ba68eb84a804623acb43a",
+  "dup_groups": 157,
+  "exclusions": [
+    {
+      "evaluation_files": [
+        "dev.jsonl"
+      ],
+      "original_id": null,
+      "reason": "duplicates_evaluation_snippet",
+      "source": "synthetic"
+    },
+    {
+      "evaluation_files": [
+        "unseen.jsonl"
+      ],
+      "original_id": null,
+      "reason": "duplicates_evaluation_snippet",
+      "source": "synthetic"
+    }
+  ],
+  "input_counts": {
+    "original": 42,
+    "synthetic": 118
+  },
+  "label_counts": {
+    "0": 70,
+    "1": 88
+  },
+  "language_counts": {
+    "bash": 22,
+    "javascript": 19,
+    "markdown": 1,
+    "python": 97,
+    "sql": 18,
+    "yaml": 1
+  },
+  "largest_dup_group": 2,
+  "near_dup_threshold": 0.85,
+  "records": 158,
+  "source_counts": {
+    "original": 42,
+    "synthetic": 116
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "artifact": {
+    "decision_threshold": 0.48,
+    "escalate_threshold": 0.64,
+    "manifest_bytes": 20934,
+    "model_bytes": 570928,
+    "model_path": "models/codeguard_clf.joblib"
+  },
+  "ast_only": {
+    "max_ms": 0.0694,
+    "mean_ms": 0.0182,
+    "min_ms": 0.0101,
+    "n": 1000,
+    "p50_ms": 0.0169,
+    "p95_ms": 0.0262
+  },
+  "cold_start": {
+    "import_and_first_analysis_ms": 1302.864,
+    "import_and_first_analysis_without_ml_ms": 162.01,
+    "import_and_model_load_ms": 1195.949,
+    "note": "subprocess, includes interpreter start",
+    "runs": 3
+  },
+  "combined": {
+    "max_ms": 3.245,
+    "mean_ms": 1.3027,
+    "min_ms": 0.8273,
+    "n": 1000,
+    "p50_ms": 1.0295,
+    "p95_ms": 2.0869
+  },
+  "combined_corroborated": {
+    "max_ms": 51.5785,
+    "mean_ms": 2.1107,
+    "min_ms": 1.3705,
+    "n": 1000,
+    "p50_ms": 1.876,
+    "p95_ms": 3.1947
+  },
+  "environment": {
+    "numpy": "2.5.3",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "AMD64 Family 25 Model 117 Stepping 2, AuthenticAMD",
+    "python": "3.12.10",
+    "scikit-learn": "1.9.1"
+  },
+  "language_only": {
+    "max_ms": 0.1187,
+    "mean_ms": 0.0425,
+    "min_ms": 0.0256,
+    "n": 1000,
+    "p50_ms": 0.0432,
+    "p95_ms": 0.0546
+  },
+  "ml_only": {
+    "max_ms": 1.9164,
+    "mean_ms": 0.7699,
+    "min_ms": 0.6642,
+    "n": 1000,
+    "p50_ms": 0.7287,
+    "p95_ms": 1.0239
+  },
+  "rules_only": {
+    "max_ms": 0.1755,
+    "mean_ms": 0.0596,
+    "min_ms": 0.0417,
+    "n": 1000,
+    "p50_ms": 0.0566,
+    "p95_ms": 0.0778
+  }
+}
