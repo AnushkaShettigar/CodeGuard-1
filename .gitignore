@@ -1,0 +1,7 @@
+﻿__pycache__/
+*.pyc
+.venv/
+marker_safe.txt
+marker_unsafe.txt
+results.txt
+tmp_*.py

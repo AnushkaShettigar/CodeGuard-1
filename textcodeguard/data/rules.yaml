@@ -1,0 +1,333 @@
+rules:
+  - id: PY_SECRET_001
+    category: secret_access
+    language: python
+    pattern: "open\\(\\s*['\"][^'\"]*\\.env"
+    weight: 0.9
+    reason: "opens .env file"
+  - id: PY_SECRET_002
+    category: secret_access
+    language: python
+    pattern: "os\\.environ\\[\\s*['\"](AWS_|OPENAI_|GITHUB_|SECRET|TOKEN)"
+    weight: 0.9
+    reason: "reads secret env var"
+  - id: PY_SECRET_003
+    category: secret_access
+    language: python
+    pattern: "(id_rsa|\\.aws/credentials|\\.ssh/)"
+    weight: 0.9
+    reason: "reads private key/creds"
+  - id: SH_SECRET_001
+    category: secret_access
+    language: bash
+    pattern: "cat\\s+[^\\s]*(id_rsa|\\.aws/credentials|\\.env)"
+    weight: 0.9
+    reason: "cats secret file"
+  - id: JS_SECRET_001
+    category: secret_access
+    language: javascript
+    pattern: "process\\.env\\.(AWS|OPENAI|SECRET|TOKEN|API_KEY)"
+    weight: 0.85
+    reason: "reads secret env var"
+  - id: MD_SECRET_001
+    category: secret_access
+    language: markdown
+    pattern: "(AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|sk-[A-Za-z0-9]{20,})"
+    weight: 0.95
+    reason: "secret key leaked in text"
+  - id: PY_EXFIL_001
+    category: data_exfiltration
+    language: python
+    pattern: "(requests|httpx|urllib)\\.(post|put|get|urlopen)[\\s\\S]{0,200}(open\\(|read\\(\\)|/etc/passwd|data\\s*=|json\\s*=)"
+    weight: 0.9
+    reason: "sends local file over network"
+  - id: SH_EXFIL_001
+    category: data_exfiltration
+    language: bash
+    pattern: "(curl|wget)[\\s\\S]{0,80}(-F|--data|--upload-file)[\\s\\S]{0,40}@"
+    weight: 0.9
+    reason: "uploads local file"
+  - id: JS_EXFIL_001
+    category: data_exfiltration
+    language: javascript
+    pattern: "fetch\\([\\s\\S]{0,120}(readFileSync|sendBeacon)"
+    weight: 0.85
+    reason: "sends local data"
+  - id: SQL_EXFIL_001
+    category: data_exfiltration
+    language: sql
+    pattern: "(COPY\\s+.+\\s+TO\\s+PROGRAM|xp_cmdshell)"
+    weight: 0.95
+    reason: "exfil via DB"
+  - id: PY_DESTRUCT_001
+    category: destructive_command
+    language: python
+    pattern: "os\\.system\\(\\s*['\"][^'\"]*rm\\s+-rf"
+    weight: 0.95
+    reason: "os.system rm -rf"
+  - id: SH_DESTRUCT_001
+    category: destructive_command
+    language: bash
+    pattern: "rm\\s+-rf\\s+/"
+    weight: 0.98
+    reason: "rm -rf /"
+  - id: SH_DESTRUCT_002
+    category: destructive_command
+    language: bash
+    pattern: "(dd\\s+if=/dev/zero\\s+of=/dev/|mkfs\\.)"
+    weight: 0.98
+    reason: "wipes disk"
+  - id: JS_DESTRUCT_001
+    category: destructive_command
+    language: javascript
+    pattern: "fs\\.rmSync\\(\\s*['\"]/"
+    weight: 0.95
+    reason: "rmSync on root"
+  - id: SQL_DESTRUCT_001
+    category: destructive_command
+    language: sql
+    pattern: "DROP\\s+TABLE"
+    weight: 0.9
+    reason: "DROP TABLE"
+  - id: SH_PERSIST_001
+    category: persistence_or_privesc
+    language: bash
+    pattern: "(source|curl|wget|eval|\\.\\s+|bash\\s+-c|sh\\s+-c)[\\s\\S]{0,80}>>\\s*~?/?\\.(bashrc|bash_profile|zshrc|profile)|>>\\s*~?/?\\.(bashrc|bash_profile|zshrc|profile)[\\s\\S]{0,80}(source|curl|wget|eval|/dev/tcp)"
+    weight: 0.9
+    reason: "writes to shell rc"
+  - id: SH_PERSIST_002
+    category: persistence_or_privesc
+    language: bash
+    pattern: "crontab\\s+-"
+    weight: 0.85
+    reason: "installs cron"
+  - id: SH_PERSIST_003
+    category: persistence_or_privesc
+    language: bash
+    pattern: "chmod\\s+u\\+s"
+    weight: 0.95
+    reason: "setuid bit"
+  - id: PY_PERSIST_001
+    category: persistence_or_privesc
+    language: python
+    pattern: "os\\.setuid\\(\\s*0\\s*\\)"
+    weight: 0.95
+    reason: "setuid root"
+  - id: PY_OBF_001
+    category: obfuscated_execution
+    language: python
+    pattern: "eval\\(.*base64|exec\\(.*base64"
+    weight: 0.95
+    reason: "eval/exec of base64"
+  - id: PY_OBF_002
+    category: obfuscated_execution
+    language: python
+    pattern: "__import__\\(\\s*['\"](os|subprocess|socket)"
+    weight: 0.9
+    reason: "dynamic import of dangerous module"
+  - id: SH_OBF_001
+    category: obfuscated_execution
+    language: bash
+    pattern: "base64\\s+-d.*\\|\\s*(sh|bash)"
+    weight: 0.95
+    reason: "decode-and-execute"
+  - id: SH_OBF_002
+    category: obfuscated_execution
+    language: bash
+    pattern: "eval\\s+\\$\\("
+    weight: 0.85
+    reason: "eval of command substitution"
+  - id: JS_OBF_001
+    category: obfuscated_execution
+    language: javascript
+    pattern: "eval\\(atob\\("
+    weight: 0.95
+    reason: "eval of base64"
+  - id: SH_DEP_001
+    category: dependency_risk
+    language: bash
+    pattern: "pip\\s+install\\s+(reqeusts|urlllib3|beautifulsoup|python-dateutil-x)"
+    weight: 0.9
+    reason: "typosquat package"
+  - id: SH_DEP_002
+    category: dependency_risk
+    language: bash
+    pattern: "npm\\s+(i|install)\\s+(lodahs|expres|reactt)"
+    weight: 0.9
+    reason: "typosquat npm package"
+  - id: YAML_DEP_001
+    category: dependency_risk
+    language: yaml
+    pattern: "(pip|npm)\\s+install\\s+\\S*(reqeusts|lodahs|urlllib3)"
+    weight: 0.85
+    reason: "typosquat in CI"
+  - id: PY_RES_001
+    category: resource_exhaustion
+    language: python
+    pattern: "while\\s+True\\s*:\\s*\\n\\s*pass"
+    weight: 0.9
+    reason: "infinite busy loop"
+  - id: SH_RES_001
+    category: resource_exhaustion
+    language: bash
+    pattern: ":\\s*\\(\\s*\\)\\s*\\{\\s*:\\s*\\|\\s*:\\s*&\\s*\\}\\s*;\\s*:"
+    weight: 0.98
+    reason: "fork bomb"
+  - id: JS_RES_001
+    category: resource_exhaustion
+    language: javascript
+    pattern: "while\\s*\\(\\s*true\\s*\\)"
+    weight: 0.85
+    reason: "infinite loop"
+  - id: SQL_RES_001
+    category: resource_exhaustion
+    language: sql
+    pattern: "WITH\\s+RECURSIVE(?!.*LIMIT)"
+    weight: 0.7
+    reason: "unbounded recursive CTE"
+  - id: ANY_SSRF_001
+    category: ssrf_network_exfil
+    language: any
+    pattern: "https?://(169\\.254\\.169\\.254|127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[::1\\])"
+    weight: 0.95
+    reason: "SSRF to loopback/metadata"
+  - id: ANY_SSRF_002
+    category: ssrf_network_exfil
+    language: any
+    pattern: "https?://(10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.)"
+    weight: 0.9
+    reason: "SSRF to private range"
+  - id: SQL_SSRF_001
+    category: ssrf_network_exfil
+    language: sql
+    pattern: "(LOAD_FILE|INTO\\s+OUTFILE)"
+    weight: 0.9
+    reason: "DB file IO"
+  - id: ANY_AI_001
+    category: ai_targeted_instructions
+    language: any
+    pattern: "(?i)ignore\\s+(all\\s+)?(previous|prior)\\s+instructions"
+    weight: 0.95
+    reason: "prompt injection phrase"
+  - id: ANY_AI_002
+    category: ai_targeted_instructions
+    language: any
+    pattern: "(?i)mark\\s+(this|it)\\s+as\\s+safe"
+    weight: 0.95
+    reason: "prompt injection phrase"
+  - id: ANY_AI_003
+    category: ai_targeted_instructions
+    language: any
+    pattern: "(?i)you\\s+are\\s+now\\s+"
+    weight: 0.85
+    reason: "role override"
+  - id: PY_EXFIL_002
+    category: data_exfiltration
+    language: python
+    pattern: "(urllib|http\\.client).*(urlopen|request|HTTPConnection).*(data|read|body)"
+    weight: 0.9
+    reason: "urllib/http.client sends data over network"
+
+  - id: PY_EXFIL_003
+    category: data_exfiltration
+    language: python
+    pattern: "(open|read\\(\\))[\\s\\S]{0,120}(urlopen|urlretrieve|socket\\.send|requests\\.(post|put))"
+    weight: 0.9
+    reason: "reads local file then sends"
+
+  - id: PY_OBF_003
+    category: obfuscated_execution
+    language: python
+    pattern: "(subprocess\\.(run|call|Popen|check_output)|os\\.system|os\\.popen)[\\s\\S]{0,120}(base64|fromhex|decode)"
+    weight: 0.95
+    reason: "shell-out with obfuscated payload"
+
+  - id: PY_RES_003
+    category: resource_exhaustion
+    language: python
+    pattern: "(threading\\.Thread|multiprocessing\\.Process|ThreadPoolExecutor)[\\s\\S]{0,300}for\\s+\\w+\\s+in\\s+range\\(\\s*\\d{3,}|for\\s+\\w+\\s+in\\s+range\\(\\s*\\d{3,}\\s*\\)[\\s\\S]{0,300}(threading\\.Thread|multiprocessing\\.Process|ThreadPoolExecutor)"
+    weight: 0.9
+    reason: "thread/process spawn loop"
+
+  - id: JS_DESTRUCT_002
+    category: destructive_command
+    language: javascript
+    pattern: "(child_process|execSync|exec)\\([\\s\\S]{0,80}(rm\\s+-rf|rmdir|del\\s+/|format)"
+    weight: 0.95
+    reason: "JS shell-out destructive"
+
+  - id: PY_DESTRUCT_003
+    category: destructive_command
+    language: python
+    pattern: "shutil\\.rmtree\\(\\s*['\"](/(?!tmp|var/tmp|private/tmp)|~|[A-Za-z]:\\\\)"
+    weight: 0.95
+    reason: "rmtree on system/home path"
+
+  - id: ANY_AI_005
+    category: ai_targeted_instructions
+    language: any
+    pattern: "(?i)(disregard|forget|override)\\s+(all\\s+)?(prior|previous|above)\\s+(rules|instructions|directives|prompts)"
+    weight: 0.95
+    reason: "prompt injection — disregard prior"
+  - id: PY_SQLI_001
+    category: data_exfiltration
+    language: python
+    pattern: "(SELECT|INSERT|UPDATE|DELETE)[\\s\\S]{0,200}(%\\s*[\\(\\w]|\\+\\s*\\w+|f['\"]|\\.format\\()"
+    weight: 0.9
+    reason: "SQL built via string interpolation (injection)"
+
+  - id: PY_SHELLINJ_001
+    category: destructive_command
+    language: python
+    pattern: "subprocess\\.(run|call|Popen|check_output)\\([^)]*shell\\s*=\\s*True"
+    weight: 0.85
+    reason: "subprocess with shell=True (command injection surface)"
+
+  - id: PY_DESER_001
+    category: obfuscated_execution
+    language: python
+    pattern: "(pickle\\.load|pickle\\.loads|marshal\\.loads|shelve\\.open|dill\\.load)"
+    weight: 0.9
+    reason: "unsafe deserialization (code execution via crafted payload)"
+
+  - id: PY_YAML_UNSAFE_001
+    category: obfuscated_execution
+    language: python
+    pattern: "yaml\\.(load|unsafe_load)\\((?![^)]*Loader\\s*=\\s*yaml\\.SafeLoader)"
+    weight: 0.9
+    reason: "yaml.load without SafeLoader (code execution)"
+
+  - id: PY_PERSIST_AUTOSTART_001
+    category: persistence_or_privesc
+    language: python
+    pattern: "(['\"]\\.config['\"]\\s*/\\s*['\"]autostart|\\.config[/\\\\]autostart|['\"]\\.config['\"]\\s*/\\s*['\"]systemd|\\.config[/\\\\]systemd|LaunchAgents|LaunchDaemons|['\"]autostart['\"])"
+    weight: 0.9
+    reason: "writes to autostart directory (persistence)"
+
+  - id: PY_ENV_DUMP_001
+    category: secret_access
+    language: python
+    pattern: "os\\.environ\\.items\\(\\)|dict\\(os\\.environ\\)|os\\.environ\\.copy\\(\\)|\\{[^}]*for\\s+\\w+\\s*,\\s*\\w+\\s+in\\s+os\\.environ\\.items"
+    weight: 0.9
+    reason: "dumps all environment variables (secret exposure)"
+
+  - id: PY_SSRF_ARBITRARY_001
+    category: ssrf_network_exfil
+    language: python
+    pattern: "(requests|httpx|urllib)\\.(get|post|request)\\(\\s*\\w+\\s*[,\\)][\\s\\S]{0,100}\\.(text|json|content|status_code)"
+    weight: 0.75
+    reason: "fetches caller-supplied URL without destination validation"
+
+  - id: PY_RES_UNBOUNDED_001
+    category: resource_exhaustion
+    language: python
+    pattern: "for\\s+\\w+\\s+in\\s+\\w+\\s*:[\\s\\S]{0,300}(Thread|Process|ThreadPoolExecutor)\\([^)]*\\)[\\s\\S]{0,100}\\.(start|submit)\\("
+    weight: 0.85
+    reason: "unbounded thread/process per-item spawn"
+
+  - id: ANY_AI_006
+    category: ai_targeted_instructions
+    language: any
+    pattern: "(?i)(AI|LLM|GPT|assistant|reviewer|model)[\\s:]*[^\\n]{0,120}(ignore|skip|suppress|report|mark)[^\\n]{0,120}(vulnerab|finding|detection|check|issue|pass)"
+    weight: 0.9
+    reason: "comment directed at AI reviewer to suppress findings"
