@@ -1,280 +1,211 @@
 # CodeGuard — Real-Time Pre-Execution Safety Layer
 
-CodeGuard is a lightweight safety gate designed to inspect code before a protected execution path runs. It uses language-aware pattern rules, a Python Abstract Syntax Tree (AST) pass and a small classical machine-learning classifier to identify suspicious code, calculate a risk score, and return an `allow` or `block` verdict.
+**CodeGuard** is a CPU-first safety gate for inspecting AI-generated code and commands *before* a protected execution path proceeds. It combines language-aware rules, Python Abstract Syntax Tree (AST) analysis, and a local classical machine-learning classifier to return an `allow` or `block` verdict.
 
-The implementation is **rules + Python AST + a classical ML classifier** (scikit-learn TF-IDF features feeding a logistic regression, CPU-only, trained from the supplied datasets). It does **not** include an SLM or an external LLM judge, and inference makes no network calls. The model, its training pipeline, its decision policy and its fallback behaviour are described under [Classical ML](#classical-ml).
+- **No external LLM is used to judge code.**
+- **Submitted snippets are analysed as text; the detector does not execute them.**
+- **The ML model is local**: TF-IDF word/character features + Logistic Regression.
+- **A Python decorator demonstrates enforcement** by blocking a decorated function before its body runs.
 
-> **Prototype status:** CodeGuard is a hackathon/research prototype, not a complete sandbox or a guarantee that arbitrary code is safe. Detection is heuristic and can produce false positives and false negatives. The interception demo covers decorated Python functions only; it does not intercept every possible execution path.
+> **Prototype disclaimer:** CodeGuard is a layered detection aid, not a sandbox or a guarantee that allowed code is safe. Regex rules, AST checks, language detection and the ML classifier can all produce false positives and false negatives. The decorator only protects calls that go through the decorated function.
 
 ## Contents
 
-- [What CodeGuard does](#what-codeguard-does)
+- [Problem and goals](#problem-and-goals)
 - [Features](#features)
-- [How it works end to end](#how-it-works-end-to-end)
-- [Architecture and source files](#architecture-and-source-files)
-- [Risk categories](#risk-categories)
-- [Verdict and risk-score calculation](#verdict-and-risk-score-calculation)
+- [Architecture](#architecture)
+- [Detection categories](#detection-categories)
+- [Decision policy and response fields](#decision-policy-and-response-fields)
+- [Repository layout](#repository-layout)
 - [Requirements](#requirements)
 - [Installation](#installation)
-- [Run the interception demo](#run-the-interception-demo)
 - [Run the API](#run-the-api)
-- [API reference](#api-reference)
-- [Training the model](#training-the-model)
-- [Run the evaluation datasets](#run-the-evaluation-datasets)
-- [Supplied dataset formats](#supplied-dataset-formats)
-- [Testing and validation](#testing-and-validation)
-- [Security notes and limitations](#security-notes-and-limitations)
-- [Classical ML](#classical-ml)
+- [API examples](#api-examples)
+- [Run the interception demo](#run-the-interception-demo)
+- [Train or rebuild the ML model](#train-or-rebuild-the-ml-model)
+- [Evaluate and benchmark](#evaluate-and-benchmark)
+- [Run tests](#run-tests)
+- [Datasets and evaluation notes](#datasets-and-evaluation-notes)
 - [Dependencies and licensing](#dependencies-and-licensing)
+- [Limitations and safe use](#limitations-and-safe-use)
 
-## What CodeGuard does
+## Problem and goals
 
-AI coding tools can generate code that reads secrets, deletes files, downloads and executes remote content, changes permissions, uploads local data, or contains instructions aimed at manipulating an AI reviewer. If that code is executed without review, it can cause harm.
+AI agents can generate code that reads credentials, sends data elsewhere, deletes files, establishes persistence, attempts privilege escalation, hides execution, installs suspicious packages, consumes excessive resources, reaches internal network addresses, or contains instructions aimed at manipulating an AI reviewer. CodeGuard inserts a synchronous inspection step between generation and execution.
 
-CodeGuard provides a synchronous inspection step before a protected execution path proceeds:
-
-1. Receive a code snippet.
-2. Guess the code language.
-3. Run applicable regular-expression rules.
-4. If the language is Python, parse and inspect its AST.
-5. Combine the findings into a risk score and verdict.
-6. Return the result to the caller.
-7. In the decorator demo, raise `GuardBlocked` before the decorated function body runs when the verdict is `block`.
-
-CodeGuard does **static analysis**: the detector does not need to run the submitted snippet to inspect it.
+The hackathon goals are to return a consistent verdict before execution, support nine threat categories, avoid external LLM-as-judge calls, run on a CPU, and demonstrate that a blocked function does not run.
 
 ## Features
 
-- CPU-first, local detection; no external LLM call and no network access during inference.
-- Language detection for Python, Bash, JavaScript, SQL, YAML, Markdown and `unknown`.
-- YAML-defined regex rules scoped by language or marked `any`.
-- Python AST checks including simple import-alias resolution and loop-scope-aware `break` detection.
-- A classical ML classifier (TF-IDF + logistic regression) that can escalate a verdict but never cancel a rule/AST finding.
-- Findings include categories, weights, reasons and source line numbers internally.
-- Risk aggregation using a noisy-OR formula.
-- JSON endpoints `/check`, `/batch` and `/health`, plus raw-text `/check/raw` and `/batch/raw` routes that need no JSON escaping.
-- A Python `@guarded` decorator that fails closed, and an interception demonstration.
-- An automated pytest suite covering the API, every risk category, the AST, language detection, the ML fallback paths and the interception guarantees.
-- Evaluation reporting confusion matrices, per-class and per-category metrics, redacted false-positive/false-negative records and ablations, plus a latency and model-size benchmark.
+- FastAPI endpoints: `POST /check`, `POST /batch`, and `GET /health`.
+- Heuristic language detection for Python, Bash, JavaScript, SQL, YAML, Markdown, and `unknown`.
+- 53 YAML-defined regular-expression rules, scoped by language or `any`.
+- Python AST checks for selected structural patterns, including some dynamic execution, destructive calls, privilege changes and constant-true loops.
+- Local scikit-learn binary classifier using word- and character-level TF-IDF features and Logistic Regression.
+- Risk aggregation, categories, human-readable reasons and vulnerable line numbers.
+- `@guarded` decorator with fail-closed handling when source inspection or analysis fails.
+- JSONL evaluation scripts, training data merge/provenance tracking, tests and benchmark reports.
 
-## How it works end to end
+## Architecture
 
 ```text
-                    Code snippet
-                         |
-                         v
-              detect_language(code)
-                         |
-                         v
-                rules.scan(code, lang)
-                         |
-                         v
-            Is the detected language Python?
-                    /           \
-                  yes            no
-                   |              |
-                   v              |
-             ast_python.scan()    |
-                   |              |
-                   +-------+------+
+                 Generated code / command
                            |
                            v
-                  Combine all findings
+                 FastAPI or Python caller
                            |
                            v
-            Calculate deterministic risk score
+                 Language detection
+                           |
+             +-------------+-------------+
+             |             |             |
+             v             v             v
+        YAML rules     Python AST     Local ML model
+        (53 rules)   (Python only)   (TF-IDF + Logistic
+             |             |          Regression)
+             +-------------+-------------+
                            |
                            v
-     ml.score(code): may escalate allow -> block
-     (never cancels a rule/AST finding)
+                  Decision cascade
+            - deduplicate deterministic hits
+            - calculate deterministic risk
+            - block high-weight findings
+            - ML may escalate allow -> block
+              but cannot cancel a deterministic block
                            |
-                           v
-                 Determine allow / block
-                           |
-              +------------+------------+
-              |                         |
-            allow                      block
-              |                         |
-              v                         v
-        Return response          Return response /
-                                 raise GuardBlocked
-                                 in decorated path
+                +----------+----------+
+                |                     |
+                v                     v
+              ALLOW                 BLOCK
+         return response       return response
+         caller may proceed    caller must not run
+                |
+                v
+       @guarded enforcement path
+       invokes function only on allow
 ```
 
-### Step 1 — Language detection
+### Detection stages
 
-`textcodeguard/detect/language.py` scores competing signals (shebangs, known shell commands, JavaScript markers, SQL statement keywords, Python syntax) and picks the strongest, with a documented tie-break order. The result controls which rules run. Python snippets receive an additional AST pass; other languages rely on language-scoped regex rules.
+1. **Language detection** — `textcodeguard/detect/language.py` uses syntax and pattern heuristics to select a likely language. It is not a full parser.
+2. **Rule scanning** — `textcodeguard/detect/rules.py` loads `textcodeguard/data/rules.yaml`. A rule includes an ID, category, language scope, pattern, weight and reason.
+3. **Python AST pass** — `textcodeguard/detect/ast_python.py` parses Python into an Abstract Syntax Tree and inspects selected code structures. It is not complete semantic analysis or taint tracking.
+4. **ML score** — `textcodeguard/detect/ml.py` loads `models/codeguard_clf.joblib` and returns a binary risky score when the model is available. It predicts risky vs safe, not the nine individual categories.
+5. **Decision cascade** — `textcodeguard/detect/cascade.py` combines deterministic findings and the ML score into the final verdict.
+6. **Enforcement** — `textcodeguard/guard.py` exposes `guard(code)` for analysis and `@guarded` for the demonstration interception boundary.
 
-Python string and comment contents are blanked before scoring other languages, so prose inside a docstring cannot decide the language. Measured against the language labels in the tracked datasets, detection is correct for 72/72 records (and 231/232 including the supplied corpora).
+## Detection categories
 
-Language detection is still heuristic, not a full parser for every language. If a snippet is misclassified, the wrong rules may run or some checks may be skipped.
+| Category | Intended coverage |
+|---|---|
+| `secret_access` | Reads or accesses values/locations that may contain credentials, API keys, tokens or private keys. |
+| `data_exfiltration` | Patterns suggesting local or sensitive data may be sent to another destination. |
+| `destructive_command` | Potentially destructive file, shell or database operations. |
+| `persistence_or_privesc` | Selected persistence mechanisms or privilege escalation/change patterns. |
+| `obfuscated_execution` | Dynamic execution, concealed/decoded payloads or selected unsafe deserialization patterns. |
+| `dependency_risk` | Selected suspicious or typosquatted package installation patterns. |
+| `resource_exhaustion` | Selected infinite-loop, fork-bomb or excessive resource patterns. |
+| `ssrf_network_exfil` | Requests to loopback, private or cloud-metadata addresses and related patterns. |
+| `ai_targeted_instructions` | Text that appears intended to manipulate an AI reviewer, for example asking it to ignore prior instructions or mark code safe. |
 
-### Step 2 — Rule scanning
+A category means that a detector pattern matched; it does not prove malicious intent or exploitability.
 
-`textcodeguard/detect/rules.py` loads `textcodeguard/data/rules.yaml`, compiles the patterns and caches them. Rules specify:
-- a stable rule ID;
-- a risk category;
-- a language (`python`, `bash`, `javascript`, `sql`, `yaml`, `markdown`, or `any`);
-- a regex pattern;
-- a weight;
-- a human-readable reason.
+## Decision policy and response fields
 
-Each match produces a finding containing its rule ID, category, weight, line number and reason. Rule scanning is text-based, so it can match patterns in comments or strings and can miss code assembled dynamically.
-
-### Step 3 — Python AST analysis
-
-For Python, `textcodeguard/detect/ast_python.py` calls `ast.parse()` to build a syntax tree. A visitor examines function calls and `while` loops for selected patterns such as `eval()`, `exec()`, some `system()` calls, `setuid()` and constant-true loops. Simple import aliases are resolved (`import os as o`, `from os import system as s`), attribute calls are matched on the resolved module so an unrelated `something.system()` is not treated as `os.system()`, and a `break` inside a nested loop or function is not credited to the outer loop.
-
-AST analysis helps distinguish code structures from raw text, but the visitor is deliberately small. It does not perform comprehensive name resolution, taint analysis or full data-flow analysis. Syntax errors result in no AST findings; regex rules may still produce findings.
-
-### Step 4 — Combine findings
-
-`textcodeguard/detect/cascade.py` combines regex and AST findings, de-duplicating by `(rule id, line)`. If there are no findings, the deterministic score is `0.0`.
-
-For findings with weights \(w_1, w_2, \ldots, w_n\), the deterministic score is:
+The deterministic risk score is calculated from rule/AST finding weights using noisy-OR:
 
 \[
-\text{risk} = 1 - \prod_{i=1}^{n}(1-w_i)
+\text{risk\_score} = 1 - \prod_{i=1}^{n}(1-w_i)
 \]
 
-The score is rounded to two decimal places. The deterministic verdict is `block` if **any single finding has weight at least `0.8`**, or if the deterministic risk score is at least `0.6`; otherwise the deterministic layer does not block.
+where each \(w_i\) is a finding's configured weight. The score is rounded to two decimal places. It is a heuristic score, **not a calibrated probability**.
 
-The returned category list and vulnerable line numbers are de-duplicated and sorted. The response reason is assembled from up to the first three findings.
+Current deterministic block conditions in `textcodeguard/detect/cascade.py`:
 
-This is a heuristic risk score, **not a calibrated probability** that code is malicious. It is also the *deterministic* score only: the ML layer never changes it (see [Classical ML](#classical-ml)).
+- Any deterministic finding with weight `>= 0.80` blocks.
+- A combined deterministic risk score `>= 0.60` blocks.
+- If deterministic checks do not block, the local ML layer may escalate the verdict when its score reaches the conservative escalation threshold stored with the model.
+- ML never cancels a deterministic block.
+- The default ML escalation mode is `any`. The optional `corroborated` and `off` modes exist for evaluation and testing.
 
-### Step 5 — Classical ML scoring
+`risk_score` retains its deterministic meaning. An ML-only escalation can therefore return `verdict: "block"` with `risk_score: 0.0`; inspect `ml_score` and `ml_used` to understand that case. ML does not assign categories or vulnerable line numbers.
 
-`textcodeguard/detect/ml.py` loads the trained scikit-learn pipeline once per process and returns `P(risky)`. The model can only **escalate** an `allow` to a `block`, and only when its score passes a conservative threshold whose precision was at least `0.90` on out-of-fold training data. A low ML score can never cancel a rule/AST finding, and ML never produces a risk category.
+### `POST /check` request
 
-If the model file is missing or unreadable, or inference raises, the ML layer reports that transparently (`ml_available: false`, `ml_score: null`) and the rules + AST detector keeps working.
-
-### Step 6 — API or interception
-
-The API calls `guard(code)` and returns a structured response. The `@guarded` decorator obtains source text for a decorated Python function, analyses it, and raises `GuardBlocked` when the verdict is `block`.
-
-The decorator is a demonstration of an interception boundary. It does not automatically intercept un-decorated functions, arbitrary subprocesses, shell invocations, or every code execution path in an application.
-
-## Architecture and source files
-
-```text
-textcodeguard/
-├── api.py                     FastAPI endpoints
-├── schema.py                  Pydantic request/response models
-├── categories.py              The canonical nine risk categories
-├── guard.py                   Public guard function and fail-closed @guarded decorator
-├── evaluate.py                Evaluation, ablations, per-category metrics, FP/FN records
-├── data/
-│   └── rules.yaml             Language-scoped regex rules
-├── detect/
-│   ├── language.py            Scored language detection
-│   ├── rules.py               Rule loading, matching and findings
-│   ├── ast_python.py          Python AST-based checks
-│   ├── ml.py                  Classical ML inference and fallback
-│   └── cascade.py             Findings aggregation and verdict logic
-└── demo/
-    └── intercept_check.py     Safe-vs-blocked execution demonstration
-
-training/
-├── build_dataset.py           Deterministic merge of labelled corpora + provenance
-├── train_model.py             Fits the pipeline, selects thresholds, writes a manifest
-└── merged_dataset.jsonl       Training pool (generated; 158 rows)
-
-models/
-├── codeguard_clf.joblib       Trained pipeline (committed so a fresh clone runs)
-└── model_manifest.json        Dataset fingerprint, counts, thresholds, versions
-
-tests/                         pytest suite (API, rules, AST, language, ML, interception)
-examples/                      Pasteable verified samples and a runner
-                           samples.jsonl, check_requests.jsonl, SAMPLES.md,
-                           run_samples.py, verify_samples.py
-benchmark.py                   Cold/warm latency, per-layer timings, model size
-docs/                          AUDIT.md, DATASET_AUDIT.md, FINAL_REPORT.md
-results/                       Raw evaluation and benchmark output (JSON)
-
-codeguard_dev.jsonl            Original labelled corpus (as supplied)
-codeguard_synthetic.jsonl      Synthetic labelled corpus (as supplied)
-dev.jsonl                      Development evaluation set
-unseen.jsonl                   Unseen evaluation set (as supplied)
-hard.jsonl                     Hard examples in the source format
-hard_eval.jsonl                Hard examples in evaluator-compatible format
-requirements.txt               Python dependencies
-WRITEUP.md                     Architecture and design notes
+```json
+{
+  "code": "print('hello world')"
+}
 ```
 
-### Main interfaces
+### Response shape
 
-- `textcodeguard.guard.guard(code: str) -> dict`: analyse a code snippet and return a response dictionary.
-- `textcodeguard.detect.cascade.analyze(code: str)`: return a `CheckResponse` object.
-- `textcodeguard.detect.cascade.analyze_explained(code: str)`: the same result plus the individual findings, for evaluation.
-- `textcodeguard.detect.ml.ml_status() / .score(code)`: ML availability and `P(risky)`.
-- `textcodeguard.guard.guarded(fn)`: fail-closed decorator that analyses a function's retrievable source before calling it.
-- `POST /check`: analyse one snippet (JSON `{"code": ...}`).
-- `POST /check/raw`: analyse one snippet (the body *is* the snippet, `text/plain`).
-- `POST /batch`: analyse a list of snippets (JSON array).
-- `POST /batch/raw`: analyse several snippets from one raw body, NUL-separated.
-- `GET /health`: basic health response.
+```json
+{
+  "verdict": "allow",
+  "risk_score": 0.0,
+  "categories": [],
+  "code_language": "python",
+  "reason": "no rules fired",
+  "vulnerable_lines": [],
+  "ml_score": 0.4116,
+  "ml_available": true,
+  "ml_used": false
+}
+```
 
-## Risk categories
+The values above illustrate the response format only; actual scores and findings depend on the submitted snippet and the installed model. Required fields are `verdict`, `risk_score`, `categories` and `code_language`. Additional ML status fields are included by this repository. `reason` and `vulnerable_lines` explain deterministic findings where available.
 
-The project targets nine categories:
+## Repository layout
 
-| Category | Meaning / examples |
-|---|---|
-| `secret_access` | Access to files or environment variables that may contain credentials, tokens or private keys. Access alone does not prove malicious intent. |
-| `data_exfiltration` | Patterns suggesting local data may be sent elsewhere. Current rules use heuristics; they do not prove data flow. |
-| `destructive_command` | File deletion, destructive shell commands, dangerous database operations or other potentially destructive actions. |
-| `persistence_or_privesc` | Patterns involving privilege changes, scheduled tasks, shell startup files or persistence locations. |
-| `obfuscated_execution` | Dynamic execution, decoding followed by execution, or unsafe deserialization patterns. |
-| `dependency_risk` | Selected suspicious or typo-squatted package-install patterns. This is not a complete package reputation service. |
-| `resource_exhaustion` | Potential infinite loops, fork bombs, or excessive process/thread creation. |
-| `ssrf_network_exfil` | Requests targeting localhost, private networks or cloud metadata addresses, plus selected related patterns. |
-| `ai_targeted_instructions` | Text that appears intended to persuade an AI reviewer to ignore, suppress or mislabel findings. |
-
-A category finding indicates a pattern matched; it does not by itself prove intent or exploitability.
-
-## Verdict and risk-score calculation
-
-The public response uses two verdicts:
-
-- `allow`: no blocking condition was met by the current detector.
-- `block`: at least one deterministic finding crossed the single-finding threshold, or the deterministic risk score crossed the aggregate threshold, or the ML layer escalated the result.
-
-Thresholds in `textcodeguard/detect/cascade.py`:
-
-| Condition | Result |
-|---|---|
-| No findings | `allow`, risk `0.0` |
-| Any finding weight `>= 0.8` | `block` |
-| Deterministic risk `>= 0.6` | `block` |
-| Otherwise, ML score `>=` the conservative escalation threshold | `block` with `ml_used: true` |
-| Otherwise | `allow` |
-
-Two fields keep this transparent. `risk_score` is the **deterministic** score only, so it does not change when ML escalates a verdict; `ml_used` tells you when a block came from the ML layer, and such a response can legitimately have `verdict: "block"` with `risk_score: 0.0`. ML never removes a finding, never lowers `risk_score`, and never reports a category.
-
-**Important:** `allow` means this implementation did not find enough evidence to block the snippet. It does not prove the code is safe.
+```text
+.
+├── textcodeguard/
+│   ├── api.py                    FastAPI endpoints
+│   ├── schema.py                 Request/response schema
+│   ├── guard.py                  Analysis entry point and @guarded decorator
+│   ├── evaluate.py               JSONL evaluation and metrics
+│   ├── categories.py              Canonical categories
+│   ├── data/rules.yaml            53 configurable detection rules
+│   ├── detect/
+│   │   ├── language.py            Language detection
+│   │   ├── rules.py               Regex rule engine
+│   │   ├── ast_python.py          Python AST analysis
+│   │   ├── ml.py                  Local classifier loader/scorer
+│   │   └── cascade.py              Decision policy
+│   └── demo/intercept_check.py    Interception demonstration
+├── models/
+│   ├── codeguard_clf.joblib       Trained local classifier
+│   └── model_manifest.json        Training metadata and thresholds
+├── training/
+│   ├── build_dataset.py           Merge/provenance/leakage checks
+│   ├── train_model.py             Model training entry point
+│   └── merged_dataset.jsonl       Prepared training pool
+├── tests/                         Automated tests
+├── results/                       Evaluation and benchmark JSON outputs
+├── docs/                          Audit and final report
+├── codeguard_dev.jsonl            Original labelled dataset
+├── codeguard_synthetic.jsonl      Synthetic labelled dataset
+├── dev.jsonl                      Development evaluation set
+├── unseen.jsonl                   Unseen evaluation set
+├── hard_eval.jsonl                Hard evaluation set
+├── benchmark.py                   Timing benchmark
+├── requirements.txt
+└── WRITEUP.md
+```
 
 ## Requirements
 
-- Python 3.10+ recommended (the project uses modern type annotations; use a version supported by the installed dependencies).
-- `pip`
-- Internet access for the initial dependency installation only; detection itself makes no network call and does not call an external LLM.
-- Windows PowerShell, Command Prompt, macOS Terminal or Linux shell.
+- Python 3.10+ (the uploaded environment was tested with Python 3.12.10).
+- `pip`.
+- Internet access is needed only to install dependencies; inference does not call an external LLM.
+- CPU is sufficient; no GPU is required.
 
-Dependencies listed in `requirements.txt` include FastAPI, Uvicorn, Pydantic v2, PyYAML, scikit-learn, joblib, NumPy, pytest and httpx.
-
-The trained model (`models/codeguard_clf.joblib`, ~571 KB) is committed so the demo and API work from a fresh clone. CodeGuard also runs without it, in rules + AST fallback mode.
+Dependencies include FastAPI, Uvicorn, Pydantic, PyYAML, `sqlparse`, scikit-learn, joblib, NumPy, pytest and httpx. Exact installed versions may vary within the version ranges in `requirements.txt`.
 
 ## Installation
 
-Clone the repository, then enter its root directory (the directory containing `requirements.txt`).
-
-```bash
-git clone https://github.com/AnushkaShettigar/CodeGuard-1.git
-cd CodeGuard-1
-```
-
-Create and activate a virtual environment.
+Run these commands from the repository root (the folder containing `requirements.txt`).
 
 ### Windows PowerShell
 
@@ -285,7 +216,7 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-If PowerShell blocks activation due to execution policy, you can use Command Prompt instead:
+If PowerShell blocks activation, use Command Prompt:
 
 ```bat
 py -3 -m venv .venv
@@ -303,60 +234,25 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-No API keys or `.env` configuration are required by the current implementation. `.env.example` documents that no external LLM is used.
-
-## Run the interception demo
-
-From the repository root, with the virtual environment activated:
-
-```bash
-python -m textcodeguard.demo.intercept_check
-```
-
-The demo:
-1. Removes old marker files if they exist.
-2. calls a decorated safe function that writes `marker_safe.txt`;
-3. calls a decorated risky function containing a suspicious `os.system("rm -rf ...")` pattern;
-4. expects `GuardBlocked` before the risky function body writes `marker_unsafe.txt`;
-5. prints `PASS` if the safe marker exists and the unsafe marker does not.
-
-The demo uses a fake path in the suspicious command; the command is intended to be detected before the body executes.
-
-### Interception failure behaviour (fail-closed)
-
-`guarded()` fails closed. If the source cannot be inspected, or the detector raises, or the verdict is malformed, the decorated function is **not** called and a `GuardError` subclass is raised:
-
-| Condition | Raised |
-|---|---|
-| `inspect.getsource` raises `OSError` or `TypeError` | `GuardInspectionError` |
-| source is empty or not a string | `GuardInspectionError` |
-| the detector raises | `GuardAnalysisError` |
-| the verdict is missing or is not `allow`/`block` | `GuardAnalysisError` |
-| the verdict is `block` | `GuardBlocked` (carries `.verdict`) |
-
-All three derive from `GuardError`, so catching that covers every refusal. Exception messages never include the function's arguments or source. There is deliberately no fail-open option.
-
-`tests/test_interception.py` proves for each row that the body is not executed: the body writes a marker file, and the test asserts the file is absent.
-
-Do not use this decorator as a sandbox for untrusted code. A Python decorator is not a substitute for OS-level isolation, restricted permissions, a container/VM sandbox or a properly controlled execution service. It only protects calls that go through the decorated function object; it does not intercept un-decorated functions, subprocesses or shell commands.
+No external LLM API key is required. Do not commit real secrets or local virtual environments to a public repository.
 
 ## Run the API
-
-From the repository root:
 
 ```bash
 python -m uvicorn textcodeguard.api:app --host 127.0.0.1 --port 8000
 ```
 
-The service will normally be available at `http://127.0.0.1:8000`.
+Open:
 
-- Interactive API documentation: `http://127.0.0.1:8000/docs`
-- OpenAPI schema: `http://127.0.0.1:8000/openapi.json`
+- API docs: `http://127.0.0.1:8000/docs`
+- OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
 - Health check: `http://127.0.0.1:8000/health`
 
-Use `127.0.0.1` for local testing. Do not expose the service publicly without appropriate deployment hardening, input limits, access controls and monitoring.
+Use `127.0.0.1` for local testing. Do not expose this prototype publicly without deployment hardening, authentication/access control, request-rate limits, logging policy and monitoring.
 
-### Example request with curl
+## API examples
+
+### Single snippet
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/check" \
@@ -364,19 +260,9 @@ curl -X POST "http://127.0.0.1:8000/check" \
   -d '{"code":"import os\nos.system(\"rm -rf /tmp/example\")"}'
 ```
 
-### Example raw request (no JSON escaping)
+### Batch of snippets
 
-The body *is* the snippet, so a file can be posted unchanged:
-
-```bash
-curl -X POST "http://127.0.0.1:8000/check/raw" \
-  -H "Content-Type: text/plain" \
-  --data-binary @generated.py
-
-cat generated.py | curl -X POST "http://127.0.0.1:8000/check/raw" --data-binary @-
-```
-
-### Example batch request
+`/batch` accepts a JSON array of request objects and returns a corresponding array of responses:
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/batch" \
@@ -384,255 +270,156 @@ curl -X POST "http://127.0.0.1:8000/batch" \
   -d '[{"code":"print(\"hello\")"},{"code":"eval(user_input)"}]'
 ```
 
-### Example raw batch request
-
-Several snippets in one body, separated by NUL (`\x00`), which cannot occur in source text:
-
-```bash
-printf 'print(1)\0import os\nos.system("rm -rf /")' \
-  | curl -X POST "http://127.0.0.1:8000/batch/raw" --data-binary @-
-```
-
-### Example health check
+### Health check
 
 ```bash
 curl "http://127.0.0.1:8000/health"
 ```
 
-Expected health response:
+Expected response:
 
 ```json
 {"ok": true}
 ```
 
-## API reference
+### Python client example
 
-### `POST /check`
+```python
+import requests
 
-Request:
-
-```json
-{
-  "code": "print('hello')"
-}
+response = requests.post(
+    "http://127.0.0.1:8000/check",
+    json={"code": "print('hello')"},
+    timeout=5,
+)
+response.raise_for_status()
+print(response.json())
 ```
 
-Response shape (captured from a real response, not an invented example):
+`requests` is only used in this example client; it is not a required runtime dependency for the CodeGuard service.
 
-```json
-{
-  "verdict": "block",
-  "risk_score": 1.0,
-  "categories": ["destructive_command"],
-  "code_language": "python",
-  "reason": "os.system rm -rf; PY_DESTRUCT_001: os.system rm -rf",
-  "vulnerable_lines": [2],
-  "ml_score": 0.7311,
-  "ml_available": true,
-  "ml_used": false
-}
-```
-
-For a snippet that is clean deterministically but escalated by the ML layer, the same shape appears with `"risk_score": 0.0`, `"verdict": "block"` and `"ml_used": true`. The Swagger page documents all three cases as response examples.
-
-### `POST /check/raw`
-
-The request body is the snippet itself. No JSON, no escaping:
+## Run the interception demo
 
 ```bash
-curl -X POST "http://127.0.0.1:8000/check/raw" --data-binary @generated.py
+python -m textcodeguard.demo.intercept_check
 ```
 
-Any content-type is accepted, the body is decoded as UTF-8, and the response is identical to `POST /check` for the same text. Because `{"code": ...}` is only an envelope, the string the detectors analyse is byte-for-byte the same either way.
+The demo uses a decorated safe function and a decorated risky function. The risky function should raise `GuardBlocked` before its body creates the unsafe marker file. A successful run prints a pass result. Review `textcodeguard/demo/intercept_check.py` for the exact behavior.
 
-### `POST /batch`
+**Important:** this proves interception only for the decorated call path. It is not a sandbox, and it does not intercept arbitrary unguarded Python functions, subprocesses or shell commands.
 
-Request:
+## Train or rebuild the ML model
 
-```json
-[
-  {"code": "print('hello')"},
-  {"code": "eval(user_input)"}
-]
+The repository includes a small local classical ML pipeline. It uses a scikit-learn `Pipeline` with a word-level and character-level TF-IDF `FeatureUnion`, followed by class-weighted Logistic Regression. No GPU or external LLM is used.
+
+The shipped model is at `models/codeguard_clf.joblib` (about 574 KB). The manifest at `models/model_manifest.json` records the dataset fingerprint, split/threshold metadata and classifier settings.
+
+To rebuild the prepared dataset from the original and synthetic corpora:
+
+```powershell
+py -3 -m training.build_dataset
 ```
 
-Response: a JSON array containing one `CheckResponse` per input item, in the same order.
+Then train the model:
 
-### `POST /batch/raw`
-
-Several snippets in one raw body, separated by NUL (`\x00`):
-
-```bash
-printf 'print(1)\0import os\nos.system("rm -rf /")' \
-  | curl -X POST "http://127.0.0.1:8000/batch/raw" --data-binary @-
+```powershell
+py -3 -m training.train_model
 ```
 
-A trailing separator is ignored, and a body with no separator is a single snippet. Response: a JSON array in the same order as the input.
+Training uses grouped stratified cross-validation on the training pool; near-duplicate records are grouped to reduce leakage across folds. The training script selects the threshold from out-of-fold predictions and does not use the separate evaluation files to fit the model. Rebuilding will replace the model artifact and manifest; retain a copy if you need to reproduce the currently reported results.
 
-### `GET /health`
+The prepared dataset currently contains 158 records: 70 safe and 88 risky. The merge report records 42 original rows and 116 synthetic rows retained after excluding two synthetic rows that duplicated evaluation snippets. See `training/merge_report.json` for the precise provenance and exclusions.
 
-Returns:
+## Evaluate and benchmark
 
-```json
-{"ok": true}
+Run the evaluator against each evaluation file:
+
+```powershell
+py -3 -m textcodeguard.evaluate dev.jsonl
+py -3 -m textcodeguard.evaluate unseen.jsonl
+py -3 -m textcodeguard.evaluate hard_eval.jsonl
 ```
 
-### Response fields
+The evaluation files are small curated sets. Results below are the saved integrated-pipeline metrics from this repository snapshot:
 
-| Field | Type | Description |
-|---|---|---|
-| `verdict` | `"allow"` or `"block"` | Final decision: deterministic rule/AST findings, or ML escalation. |
-| `risk_score` | number from `0.0` to `1.0` | Heuristic **deterministic** score; not a calibrated probability. Unchanged by the ML layer. |
-| `categories` | list of strings | Distinct categories matched by rule/AST findings. ML never contributes a category. |
-| `code_language` | string | Language selected by the heuristic detector. |
-| `reason` | string | Short explanation assembled from the first few findings; states `ml_escalation(...)` when ML changed the verdict. |
-| `vulnerable_lines` | list of integers | Distinct source line numbers associated with findings. |
-| `ml_score` | number or `null` | Uncalibrated model `P(risky)`; `null` when ML did not run. |
-| `ml_available` | boolean | `true` when the model loaded and produced a score. |
-| `ml_used` | boolean | `true` when the ML score changed this verdict (escalated `allow` to `block`). |
+| Set | Samples | Accuracy | Risky recall | False positives | False negatives |
+|---|---:|---:|---:|---:|---:|
+| `dev.jsonl` | 18 | 83.3% | 100% | 3 | 0 |
+| `unseen.jsonl` | 24 | 87.5% | 100% | 3 | 0 |
+| `hard_eval.jsonl` | 15 | 86.7% | 100% | 2 | 0 |
+| **Pooled** | **57** | **86.0%** | **100%** | **8** | **0** |
 
-The schema validates the response shape. The API does **not** provide authentication or rate limiting. Input limits do exist: `code` is capped at 100,000 characters (`422` on `/check`, `413` on `/check/raw`), and batches at 500 items and 1,000,000 characters (`413`).
+These figures correspond to the default combined configuration (`ml_escalate_mode="any"`) in the checked-in result files. They are results on this specific small evaluation pool, not an independent security certification. The test sets may not represent the full variety of real-world code. Category precision/recall can also differ from overall allow/block accuracy.
 
-## Run the evaluation datasets
+Run the benchmark:
 
-Run evaluation from the project root so the relative paths resolve.
-
-```bash
-python -m textcodeguard.evaluate dev.jsonl
-python -m textcodeguard.evaluate unseen.jsonl
-python -m textcodeguard.evaluate hard_eval.jsonl
-python -m textcodeguard.evaluate dev.jsonl --json results/dev.eval.json
+```powershell
+py -3 benchmark.py
 ```
 
-On Windows, `py -3 -m ...` can be used if that is how Python is installed.
+Saved timings in `results/benchmark.json` were measured on Windows 11 with Python 3.12.10 and an AMD64 processor. Warm measurements (1000 iterations) were:
 
-`evaluate.py` accepts either schema per non-empty line: `code` plus `verdict` (`"allow"`/`"block"`) and optionally `categories`, or `code` plus `label` (`0`/`1`) and optionally a canonical `category`.
+| Component | Mean | p95 |
+|---|---:|---:|
+| Language detection | 0.044 ms | 0.059 ms |
+| Rule scan | 0.060 ms | 0.075 ms |
+| Python AST scan | 0.018 ms | 0.025 ms |
+| ML-only scoring | 0.733 ms | 0.878 ms |
+| Combined detector | 1.058 ms | 1.834 ms |
+| Combined corroborated mode | 1.877 ms | 2.564 ms |
 
-For the same examples it reports six configurations - `rules_only`, `rules_ast`, `ml_only`, `ml_only_conservative`, `combined` (the shipped default) and `combined_corroborated` - each with a confusion matrix, accuracy, balanced accuracy, precision/recall/F1 for both classes, false-positive and false-negative rates, and MCC. It also reports per-category precision/recall/F1 for the combined configuration, prints every false positive and false negative with a **redacted** snippet preview, and records observed warm latency after warm-up calls (so it is no longer dominated by the first, cold call).
+Cold-start measurements include starting a subprocess and importing Python modules: about 1.25 seconds with ML, compared with about 157 ms without ML in the recorded environment. These numbers are machine- and environment-dependent; benchmark again on the target machine.
 
-Model fitting and threshold selection never happen here; they live in `training/`. `py -3 -m benchmark` reports cold and warm latency, per-layer timings and model size.
+## Run tests
 
-### Supplied dataset formats
+From the repository root:
 
-- `codeguard_dev.jsonl`: 42 labelled records (original corpus, as supplied). Not tracked in git.
-- `codeguard_synthetic.jsonl`: 118 labelled records marked `synthetic: true` (as supplied). Not tracked in git.
-- `dev.jsonl`: 18 examples, balanced between 9 `allow` and 9 `block` verdicts.
-- `unseen.jsonl`: 24 examples, balanced between 12 `allow` and 12 `block` verdicts.
-- `hard_eval.jsonl`: 15 examples, with 8 `block` and 7 `allow` verdicts.
-- `hard.jsonl`: the **same 15 snippets** as `hard_eval.jsonl` in the labelled format, so the hard set is not an independent sample.
-- `training/merged_dataset.jsonl`: generated training pool, 158 rows, with `source` provenance and a `dup_group` used to keep near-duplicates in the same split.
-
-The synthetic corpus uses its own free-form topic tags (`command_injection`, `hardcoded_secret`, ...) that do **not** map onto the canonical nine, so it cannot train a nine-class model and was not used to do so.
-
-Dataset record counts and labels describe the supplied files, not the full universe of possible code. The original datasets are preserved unchanged.
-
-### Interpreting evaluation results
-
-The project notes report 100% overall verdict accuracy on the supplied `dev.jsonl`, `unseen.jsonl` and `hard_eval.jsonl` sets. Those sets are small, and they were used while the rules were being written, so they are **development/tuned** sets rather than untouched test data. A perfect score there is not proof of general-purpose security.
-
-Measured results, including the ablations, are recorded in `results/*.eval.json` and summarised in `docs/FINAL_REPORT.md`. Two numbers are worth carrying in mind:
-
-- On the curated sets the deterministic layer scores 1.000, but on the larger supplied corpus it recalls only ~0.40 of the labelled risky rows. That gap is why the ML layer exists.
-- ML escalation adds false positives on benign code that uses the same APIs as the attacks (`pip install ...`, unrelated `.system()` calls). On the curated sets these are the only errors: 2 across the three sets (both on `dev.jsonl`), all false positives, none missed attacks.
-
-Out-of-fold model metrics (the honest generalization estimate) are ROC-AUC 0.858, PR-AUC 0.877, and at the conservative escalation threshold precision 0.939 / recall 0.352 / false-positive rate 0.029.
-
-## Testing and validation
-
-An automated pytest suite lives in `tests/` and covers the API (both JSON and raw routes, limits, malformed input), a positive and negative case for each of the nine categories, dangerous-looking text in comments and strings, language-detection regressions, AST aliases and loop scoping, ML training guards and every fallback path, fail-closed interception, and proofs that submitted snippets are never executed.
-
-```bash
+```powershell
 python -m pytest -q
 ```
 
-Other checks:
+The test suite covers AST checks, decision policy, evaluator metrics, examples, interception, language detection, ML loading/scoring, no-execution behavior, required categories and API schema. Tests should be run after modifying rules, thresholds, training data or the model.
 
-```bash
-python -m textcodeguard.demo.intercept_check     # prints PASS
-python -m textcodeguard.evaluate dev.jsonl
-python -m benchmark
-python -m examples.run_samples                   # 73 verified samples, reports gaps
-```
+## Datasets and evaluation notes
 
-`examples/run_samples.py` can also drive a running service (`--url`) over either the JSON or the raw route, and `tests/test_examples.py` fails if any recorded sample verdict ever drifts.
+- `codeguard_dev.jsonl`: 42 original labelled records.
+- `codeguard_synthetic.jsonl`: 118 synthetic labelled records.
+- `training/merged_dataset.jsonl`: 158 records retained for training after deduplication/leakage exclusions.
+- `dev.jsonl`, `unseen.jsonl`, `hard_eval.jsonl`: separate evaluation inputs. They are not the same thing as the training pool.
 
-## Security notes and limitations
+Dataset labels and categories are only as reliable as their annotation and generation process. Synthetic examples can make evaluation look easier if they resemble rules or training records. The build script excludes exact normalized overlaps with evaluation snippets and groups near-duplicates for grouped cross-validation, but that does not remove all possible dataset bias or prove generalization.
 
-1. **Heuristic detection:** regex rules and selected AST patterns can miss attacks and flag benign code.
-2. **Not a sandbox:** scanning and a decorator do not isolate the process. Do not execute untrusted code merely because CodeGuard returned `allow`.
-3. **Interception scope:** `@guarded` fails closed, but it only protects calls through the decorated function object. It does not intercept un-decorated functions, subprocesses or shell commands.
-4. **Rule layer scans raw text:** a dangerous-looking *string* or *comment* can be flagged, because rules match text rather than syntax.
-5. **Limited AST coverage:** only a small subset of Python constructs is analysed structurally.
-6. **No full taint analysis:** a local file read plus an HTTP upload is a heuristic correlation, not proven source-to-sink data flow.
-7. **Obfuscation limits:** multi-stage encodings and dynamic construction may evade simple patterns.
-8. **Language detection is heuristic:** Python AST runs only when the detector identifies the snippet as Python. It is regex-based for every other language, and SSRF matching covers private IPv4 ranges and the common metadata IP only.
-9. **Risk score is not probability:** `risk_score` aggregates hand-assigned weights; `ml_score` is likewise uncalibrated.
-10. **ML precision:** the classifier over-flags benign code that uses network/subprocess/install APIs, which is the source of its measured false positives. It is capped so it can only escalate, never downgrade.
-11. **Thin categories:** `dependency_risk` has four labelled examples and three typosquat patterns; it is not a dependency-reputation service.
-12. **Evaluation provenance:** the curated sets are small and rule-informed; `hard.jsonl` mirrors `hard_eval.jsonl`; the synthetic corpus is generated. None of it supports a real-world security claim.
-13. **No external LLM judge:** the detector does not send source code to an external model.
-14. **No authentication/rate limiting:** the API is a local prototype and needs additional controls before public deployment.
-15. **Cold start:** importing scikit-learn costs about a second on first use; a health check can pass before the model is loaded.
-
-## Classical ML
-
-A classical ML classifier **is** wired into the detector. It is deliberately small, explainable and CPU-only: no SLM, no external LLM judge, no GPU, no network call at inference time.
-
-- **Model.** `Pipeline(FeatureUnion(TF-IDF word 1-2-grams, TF-IDF char_wb 3-5-grams) -> LogisticRegression(class_weight="balanced", solver="liblinear"))`, persisted with `joblib` to `models/codeguard_clf.joblib`.
-- **Label.** Binary only (safe / risky). It never predicts one of the nine categories, because the labelled corpora do not support a nine-class target.
-- **Training data.** 158 rows merged from `codeguard_dev.jsonl` (42) and `codeguard_synthetic.jsonl` (116 after two evaluation-duplicating rows were excluded), with explicit `source` provenance and near-duplicate `dup_group` clustering.
-- **Validation.** `StratifiedGroupKFold` (5 folds) grouped by `dup_group`, so near-duplicates cannot straddle folds. Vectorisation and the classifier are fit on training rows only; the evaluation files are never read by the training scripts.
-- **Thresholds.** Two, both chosen on out-of-fold predictions only: `decision_threshold = 0.48` (F1-maximising) and `escalate_threshold = 0.64` (highest recall with out-of-fold precision >= 0.90). The cascade only ever uses the conservative one.
-- **Policy.** ML can escalate `allow` to `block`; it can never cancel a rule/AST finding, lower `risk_score`, or add a category. Modes `off` and `corroborated` are available for comparison.
-- **Fallback.** A missing, unreadable or failing model is reported as `ml_available: false` / `ml_score: null`, and rules + AST keep working. There is no silent pretence that ML ran.
-- **Manifest.** `models/model_manifest.json` records the dataset fingerprint, record and label counts, fold sizes, thresholds, the full threshold sweep, dependency versions and a timestamp.
-
-Measured, out-of-fold (the honest generalization estimate): ROC-AUC 0.858, PR-AUC 0.877, and at the escalation threshold precision 0.939, recall 0.352, false-positive rate 0.029. The model is **not calibrated**, so `ml_score` is a score, not a probability.
-
-### Training the model
-
-```bash
-python -m training.build_dataset     # -> training/merged_dataset.jsonl + merge_report.json
-python -m training.train_model       # -> models/codeguard_clf.joblib + model_manifest.json
-```
-
-`build_dataset` refuses malformed input, records its exclusions, and never modifies the supplied files. `train_model` refuses a missing, malformed or single-class dataset, writes a clear error, and is deterministic for a fixed seed. A rerun reproduces `decision=0.48` and `escalate=0.64`.
-
-### Remaining ML work
-
-- Rebalance the training corpus with benign network/subprocess/install examples to cut the measured false positives, then re-select the escalation threshold on out-of-fold data.
-- Calibrate the scores (isotonic/Platt) before anything treats `ml_score` as a probability.
-- Grow the corpus so `dependency_risk` and the other thin categories have more than a handful of labelled examples.
-- If a nine-class target is ever wanted, the synthetic tags must be mapped onto the canonical categories explicitly, and that mapping must be audited.
+The detector should be evaluated on larger, independently collected samples, with precision, recall, false positives, false negatives and per-category results reported. Avoid claiming perfect real-world detection from the current results.
 
 ## Dependencies and licensing
 
-Dependencies in `requirements.txt` include:
-- FastAPI
-- Uvicorn
-- Pydantic
-- PyYAML
-- scikit-learn
-- joblib
-- NumPy
-- pytest
-- httpx
-- sqlparse (declared, optional/unused)
+The project directly uses these libraries:
 
-The existing project notes list licenses for third-party packages, but users should verify the license of each dependency and the repository's own license before redistribution. No project license file was present in the supplied ZIP; add one if the team intends to publish the project under a specific open-source license.
+| Component | Use | License note |
+|---|---|---|
+| FastAPI | HTTP API | MIT |
+| Uvicorn | ASGI server | BSD-3-Clause |
+| Pydantic | Request/response validation | MIT |
+| PyYAML | Load rule configuration | MIT |
+| sqlparse | SQL-related parsing utility dependency | BSD-3-Clause |
+| scikit-learn | TF-IDF and Logistic Regression | BSD-3-Clause |
+| joblib | Model serialization/loading | BSD-3-Clause |
+| NumPy | Numerical dependency | BSD-3-Clause |
+| pytest | Automated tests | MIT |
+| httpx | API/test client | BSD-3-Clause |
 
-## Contributing / development checklist
+The model is trained from the repository's included labelled datasets; it is not a downloaded pretrained foundation model. The project does not use an external LLM-as-judge. Confirm third-party notices and transitive dependency licenses for the exact versions distributed before publication.
 
-Before submitting changes:
-- [ ] Keep original evaluation data unchanged.
-- [ ] Add regression tests for every bug fix.
-- [ ] Run the demo and evaluation commands.
-- [ ] Report metrics with dataset sizes and limitations.
-- [ ] Document whether changes affect the public API schema.
-- [ ] Never claim a security guarantee beyond what is tested.
-- [ ] Do not run submitted code as part of static detection.
-- [ ] Keep the detector local and deterministic unless the design explicitly changes.
+## Limitations and safe use
 
-## Authors and acknowledgement
+- **Heuristic detection:** patterns may miss obfuscated, dynamically constructed, aliased or multi-file behavior.
+- **No full taint/data-flow analysis:** matching a read and a network call does not prove that sensitive data flows between them.
+- **Language detection is approximate:** misclassification can skip language-specific checks.
+- **ML score is not calibrated probability:** it is a classifier score used for escalation, not a probability guarantee.
+- **False positives:** defensive thresholds can block benign code, including code with suspicious-looking patterns.
+- **False negatives:** code that does not match known patterns may be allowed.
+- **No runtime sandbox:** CodeGuard does not isolate the operating system or restrict filesystem/network permissions.
+- **Decorator scope:** only decorated calls are checked; unguarded execution paths remain outside its protection.
+- **No category prediction by ML:** categories come from deterministic rules/AST findings. An ML-only block may have an empty category list.
 
-CodeGuard was developed as a team hackathon project. Add the team members, institution, event name and any required acknowledgements here before submission.
+Use CodeGuard as one layer in a defense-in-depth design. For genuinely untrusted code, combine pre-execution analysis with OS-level sandboxing, least-privilege execution, network restrictions, resource limits and independent security testing.
