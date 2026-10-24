@@ -1,24 +1,39 @@
 ﻿"""CodeGuard HTTP service.
 
-Three ways to submit a snippet:
+Routes:
 
-* ``POST /check``      - JSON envelope ``{"code": "..."}`` (validated by Pydantic)
-* ``POST /check/raw``  - the snippet itself as the request body (``text/plain``)
+* ``POST /check``      - JSON envelope ``{"code": "..."}``
+* ``POST /check/raw``  - the snippet itself as the body (``text/plain``)
 * ``POST /batch``      - JSON array of ``{"code": "..."}`` objects
+* ``POST /batch/raw``  - NUL-separated snippets in one raw body
+* ``GET  /health``     - liveness (always open, no auth)
 
-Both single-snippet routes run the *same* detector and return the same
-``CheckResponse``, so the format is purely a transport choice.
+Optional hardening, all controlled by environment variables so local development
+and tests are unaffected:
+
+* ``CODEGUARD_API_KEY``   - when set, analysis routes require ``X-API-Key``.
+* ``CODEGUARD_RATE_LIMIT`` - requests per minute per client (default 120, 0 = off).
+* ``CODEGUARD_WARMUP``    - ``0`` disables the startup warm-up.
+
+A failure inside the detector is reported as HTTP 503 with ``verdict: "block"``:
+the service fails closed rather than implying the snippet was checked and cleared.
 """
 
+import os
+import secrets
+import threading
+import time
+from contextlib import asynccontextmanager
 from typing import List
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from textcodeguard.guard import guard
 from textcodeguard.schema import CheckRequest, CheckResponse
 
 # Same limit as CheckRequest.code (Pydantic max_length), enforced manually on the
-# raw route because there is no Pydantic model to do it there.
+# raw routes because there is no Pydantic model to do it there.
 MAX_CODE_CHARS = 100_000
 # Bounds for batch requests so a single call cannot trigger unbounded work.
 MAX_BATCH_ITEMS = 500
@@ -27,15 +42,135 @@ MAX_BATCH_CHARS = 1_000_000
 # text of any supported language (the same convention as `xargs -0`).
 RAW_BATCH_SEPARATOR = b"\x00"
 
+API_KEY_ENV = "CODEGUARD_API_KEY"
+RATE_LIMIT_ENV = "CODEGUARD_RATE_LIMIT"
+WARMUP_ENV = "CODEGUARD_WARMUP"
+DEFAULT_RATE_LIMIT = 600
+
+
+# --------------------------------------------------------------------------
+# Optional API-key authentication
+# --------------------------------------------------------------------------
+def configured_api_key() -> str:
+    return os.environ.get(API_KEY_ENV, "").strip()
+
+
+def require_api_key(request: Request) -> None:
+    """Require ``X-API-Key`` when ``CODEGUARD_API_KEY`` is set; otherwise allow all."""
+    expected = configured_api_key()
+    if not expected:
+        return
+    provided = request.headers.get("x-api-key", "")
+    if not provided or not secrets.compare_digest(provided, expected):
+        raise HTTPException(
+            status_code=401,
+            detail="missing or invalid X-API-Key",
+            headers={"WWW-Authenticate": "X-API-Key"},
+        )
+
+
+# --------------------------------------------------------------------------
+# In-process rate limiting (fixed window per client, no external dependency)
+# --------------------------------------------------------------------------
+class _RateLimiter:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._hits: dict[str, list[float]] = {}
+
+    def reset(self) -> None:
+        with self._lock:
+            self._hits.clear()
+
+    def check(self, key: str, limit: int, window: float = 60.0) -> None:
+        if limit <= 0:
+            return
+        now = time.monotonic()
+        with self._lock:
+            if len(self._hits) > 10_000:  # keep memory bounded under abuse
+                self._hits.clear()
+            recent = [t for t in self._hits.get(key, ()) if now - t < window]
+            if len(recent) >= limit:
+                self._hits[key] = recent
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"rate limit exceeded ({limit} requests/minute)",
+                    headers={"Retry-After": "60"},
+                )
+            recent.append(now)
+            self._hits[key] = recent
+
+
+limiter = _RateLimiter()
+
+
+def rate_limit_env() -> int:
+    raw = os.environ.get(RATE_LIMIT_ENV)
+    if raw is None or not raw.strip():
+        return DEFAULT_RATE_LIMIT
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return DEFAULT_RATE_LIMIT
+
+
+def rate_limit(request: Request) -> None:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    client = (
+        forwarded.split(",")[0].strip()
+        if forwarded
+        else (request.client.host if request.client else "unknown")
+    )
+    limiter.check(client, rate_limit_env())
+
+
+# --------------------------------------------------------------------------
+# Startup warm-up: pay the model load and first-inference cost before serving
+# --------------------------------------------------------------------------
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    if os.environ.get(WARMUP_ENV, "1") != "0":
+        try:
+            from textcodeguard.detect import ml
+
+            ml.ml_status()          # imports sklearn + loads the pipeline
+            guard("print('warmup')\n")  # compiles rules, runs one full analysis
+        except Exception:  # noqa: BLE001 - warm-up must never prevent startup
+            pass
+    yield
+
+
 app = FastAPI(
     title="CodeGuard",
-    version="1.0.0",
+    version="1.1.0",
     description=(
         "Real-time pre-execution safety layer for generated code. Analyses a snippet "
         "statically (rules + Python AST + a classical ML classifier) and returns an "
         "allow/block verdict. Submitted code is never executed."
     ),
+    lifespan=lifespan,
 )
+
+# Applied to every analysis route, in this order.
+_PROTECT = [Depends(require_api_key), Depends(rate_limit)]
+
+
+@app.exception_handler(Exception)
+async def fail_closed(_request: Request, exc: Exception) -> JSONResponse:
+    """Never imply a snippet was cleared when the detector itself failed.
+
+    Returns 503 (a service problem, not a verdict) together with
+    ``verdict: "block"`` so a caller that only reads ``verdict`` still fails safe.
+    The exception message is not echoed: it could contain submitted source.
+    """
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "analysis failed; treat this snippet as blocked",
+            "verdict": "block",
+            "error_type": type(exc).__name__,
+        },
+    )
+
 
 _RAW_REQUEST_BODY = {
     "required": True,
@@ -53,7 +188,12 @@ _RAW_REQUEST_BODY = {
 }
 
 
-@app.post("/check", response_model=CheckResponse, summary="Analyse one snippet (JSON)")
+@app.post(
+    "/check",
+    response_model=CheckResponse,
+    summary="Analyse one snippet (JSON)",
+    dependencies=_PROTECT,
+)
 def check(req: CheckRequest) -> CheckResponse:
     """Analyse ``req.code`` and return the verdict."""
     return CheckResponse(**guard(req.code))
@@ -64,6 +204,7 @@ def check(req: CheckRequest) -> CheckResponse:
     response_model=CheckResponse,
     summary="Analyse one snippet (raw text body)",
     openapi_extra={"requestBody": _RAW_REQUEST_BODY},
+    dependencies=_PROTECT,
 )
 async def check_raw(request: Request) -> CheckResponse:
     """Analyse the request body as the snippet itself.
@@ -108,7 +249,12 @@ async def check_raw(request: Request) -> CheckResponse:
     return CheckResponse(**guard(code))
 
 
-@app.post("/batch", response_model=List[CheckResponse], summary="Analyse many snippets (JSON)")
+@app.post(
+    "/batch",
+    response_model=List[CheckResponse],
+    summary="Analyse many snippets (JSON)",
+    dependencies=_PROTECT,
+)
 def batch(reqs: List[CheckRequest]) -> List[CheckResponse]:
     """Analyse a list of snippets in one call; returns one result per input."""
     if len(reqs) > MAX_BATCH_ITEMS:
@@ -137,6 +283,7 @@ def batch(reqs: List[CheckRequest]) -> List[CheckResponse]:
             },
         }
     },
+    dependencies=_PROTECT,
 )
 async def batch_raw(request: Request) -> List[CheckResponse]:
     """Analyse several snippets in one raw body, separated by NUL (``\\x00``).
@@ -200,7 +347,8 @@ async def batch_raw(request: Request) -> List[CheckResponse]:
 def health() -> dict:
     """Return ``{"ok": true}`` when the service is receiving traffic.
 
-    Note this does *not* imply the ML model has been loaded; the first analysis
-    pays that one-off cost. See ``ml_status()`` for model state.
+    Always open (no API key, no rate limit) so an uptime probe works without
+    credentials. By the time this responds, the startup warm-up has completed, so
+    the first analysis request is not paying the model-load cost.
     """
     return {"ok": True}
