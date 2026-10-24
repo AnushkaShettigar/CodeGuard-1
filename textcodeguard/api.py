@@ -8,19 +8,18 @@ Routes:
 * ``POST /batch/raw``  - NUL-separated snippets in one raw body
 * ``GET  /health``     - liveness (always open, no auth)
 
-Optional hardening, all controlled by environment variables so local development
-and tests are unaffected:
+Optional hardening, controlled by environment variables so local development and
+tests are unaffected:
 
-* ``CODEGUARD_API_KEY``   - when set, analysis routes require ``X-API-Key``.
-* ``CODEGUARD_RATE_LIMIT`` - requests per minute per client (default 120, 0 = off).
+* ``CODEGUARD_RATE_LIMIT`` - requests per minute per client (default 600, 0 = off).
 * ``CODEGUARD_WARMUP``    - ``0`` disables the startup warm-up.
 
-A failure inside the detector is reported as HTTP 503 with ``verdict: "block"``:
-the service fails closed rather than implying the snippet was checked and cleared.
+There is **no authentication**: the service accepts requests from anyone who can
+reach it. Bind it to ``127.0.0.1`` or put it behind a trusted network / tunnel with
+its own access control before exposing it publicly.
 """
 
 import os
-import secrets
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -42,31 +41,9 @@ MAX_BATCH_CHARS = 1_000_000
 # text of any supported language (the same convention as `xargs -0`).
 RAW_BATCH_SEPARATOR = b"\x00"
 
-API_KEY_ENV = "CODEGUARD_API_KEY"
 RATE_LIMIT_ENV = "CODEGUARD_RATE_LIMIT"
 WARMUP_ENV = "CODEGUARD_WARMUP"
 DEFAULT_RATE_LIMIT = 600
-
-
-# --------------------------------------------------------------------------
-# Optional API-key authentication
-# --------------------------------------------------------------------------
-def configured_api_key() -> str:
-    return os.environ.get(API_KEY_ENV, "").strip()
-
-
-def require_api_key(request: Request) -> None:
-    """Require ``X-API-Key`` when ``CODEGUARD_API_KEY`` is set; otherwise allow all."""
-    expected = configured_api_key()
-    if not expected:
-        return
-    provided = request.headers.get("x-api-key", "")
-    if not provided or not secrets.compare_digest(provided, expected):
-        raise HTTPException(
-            status_code=401,
-            detail="missing or invalid X-API-Key",
-            headers={"WWW-Authenticate": "X-API-Key"},
-        )
 
 
 # --------------------------------------------------------------------------
@@ -150,8 +127,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Applied to every analysis route, in this order.
-_PROTECT = [Depends(require_api_key), Depends(rate_limit)]
+# Applied to every analysis route.
+_PROTECT = [Depends(rate_limit)]
 
 
 @app.exception_handler(Exception)

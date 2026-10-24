@@ -1,4 +1,4 @@
-"""Hardening tests: optional API key, rate limiting, startup warm-up, fail-closed errors."""
+"""Hardening tests: rate limiting, startup warm-up, fail-closed errors."""
 
 from __future__ import annotations
 
@@ -11,50 +11,6 @@ from textcodeguard.detect import ml
 
 client = TestClient(app)
 RISKY = "import os\nos.system('rm -rf /')\n"
-
-
-# ---------------------------------------------------------------- auth ----
-def test_auth_disabled_when_no_key_configured(monkeypatch):
-    monkeypatch.delenv(api_module.API_KEY_ENV, raising=False)
-    assert client.post("/check", json={"code": RISKY}).status_code == 200
-
-
-def test_auth_requires_key_when_configured(monkeypatch):
-    monkeypatch.setenv(api_module.API_KEY_ENV, "s3cret-key")
-    assert client.post("/check", json={"code": RISKY}).status_code == 401
-    assert client.post("/check", json={"code": RISKY},
-                       headers={"X-API-Key": "wrong"}).status_code == 401
-
-
-def test_auth_accepts_correct_key(monkeypatch):
-    monkeypatch.setenv(api_module.API_KEY_ENV, "s3cret-key")
-    r = client.post("/check", json={"code": RISKY}, headers={"X-API-Key": "s3cret-key"})
-    assert r.status_code == 200
-    assert r.json()["verdict"] == "block"
-
-
-def test_auth_protects_every_analysis_route(monkeypatch):
-    monkeypatch.setenv(api_module.API_KEY_ENV, "s3cret-key")
-    headers = {"X-API-Key": "s3cret-key"}
-    assert client.post("/check/raw", content=RISKY).status_code == 401
-    assert client.post("/batch", json=[{"code": RISKY}]).status_code == 401
-    assert client.post("/batch/raw", content=RISKY.encode()).status_code == 401
-    # and all work with the key
-    assert client.post("/check/raw", content=RISKY, headers=headers).status_code == 200
-    assert client.post("/batch", json=[{"code": RISKY}], headers=headers).status_code == 200
-    assert client.post("/batch/raw", content=RISKY.encode(), headers=headers).status_code == 200
-
-
-def test_health_stays_open_when_auth_is_enabled(monkeypatch):
-    monkeypatch.setenv(api_module.API_KEY_ENV, "s3cret-key")
-    assert client.get("/health").status_code == 200
-
-
-def test_unauthorized_response_does_not_echo_the_key(monkeypatch):
-    monkeypatch.setenv(api_module.API_KEY_ENV, "s3cret-key")
-    r = client.post("/check", json={"code": RISKY}, headers={"X-API-Key": "guess"})
-    assert "s3cret-key" not in r.text
-    assert "guess" not in r.text
 
 
 # --------------------------------------------------------- rate limiting ----
